@@ -2,13 +2,13 @@
 
 ComfyUI custom nodes for [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2), with text-to-speech, audio-only voice cloning, SDPA and FlashAttention inference, native progress reporting, and ComfyUI/AIMDO memory management.
 
-[![Version](https://img.shields.io/badge/version-0.1.6-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.1.7-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
 [![Official Model](https://img.shields.io/badge/Hugging_Face-Zyphra%2FZONOS2-ffd21e)](https://huggingface.co/Zyphra/ZONOS2)
 [![Native BF16 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--BF16-ffd21e)](https://huggingface.co/drbaph/ZONOS2-BF16)
-[![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS-FP8)
+[![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS2-FP8)
 [![Model License](https://img.shields.io/badge/Model_License-Apache--2.0-green)](https://huggingface.co/Zyphra/ZONOS2)
 
 [简体中文](README_zh.md)
@@ -117,7 +117,7 @@ ComfyUI/models/zonos2/
 Two model presets are included:
 
 - **ZONOS2 BF16** downloads `zonos2-bf16.safetensors` and missing shared assets from [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16).
-- **ZONOS2 FP8 Mixed** downloads `zonos2-fp8-mixed.safetensors` and missing shared assets from [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8).
+- **ZONOS2 FP8 Mixed** downloads `zonos2-fp8-mixed.safetensors` and missing shared assets from [drbaph/ZONOS2-FP8](https://huggingface.co/drbaph/ZONOS2-FP8).
 
 Downloads are checked independently and reuse the same local folders across both presets:
 
@@ -260,11 +260,11 @@ Without DynamicVRAM, measured BF16 CUDA allocation with the main model and DAC l
 
 **The model dropdown download fails or returns 404**
 
-Confirm the selected repository contains its root checkpoint plus `dac_44khz/` and `speaker_encoder/`: [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) for BF16 or [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8) for mixed FP8. Partial uploads can fail until the requested file is available. Existing complete local asset folders are not downloaded again.
+Confirm the selected repository contains its root checkpoint plus `dac_44khz/` and `speaker_encoder/`: [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) for BF16 or [drbaph/ZONOS2-FP8](https://huggingface.co/drbaph/ZONOS2-FP8) for mixed FP8. Partial uploads can fail until the requested file is available. Existing complete local asset folders are not downloaded again.
 
 **FP8 reports an unsupported format or a 3D linear weight**
 
-Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.6 rejects the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
+Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.7 rejects the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
 
 **FlashAttention is unavailable**
 
@@ -337,5 +337,5 @@ If you find this model useful in an academic context, please cite:
 - [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2)
 - [Official Zyphra/ZONOS2 model release](https://huggingface.co/Zyphra/ZONOS2)
 - [Native BF16 ComfyUI model package](https://huggingface.co/drbaph/ZONOS2-BF16)
-- [Mixed FP8 ComfyUI model package](https://huggingface.co/drbaph/ZONOS-FP8)
+- [Mixed FP8 ComfyUI model package](https://huggingface.co/drbaph/ZONOS2-FP8)
 - [Descript DAC 44.1 kHz](https://huggingface.co/descript/dac_44khz)

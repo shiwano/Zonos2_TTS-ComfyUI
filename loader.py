@@ -28,7 +28,7 @@ logger = logging.getLogger("Zonos2_TTS-ComfyUI")
 
 MODEL_FOLDER_NAME = "zonos2"
 BF16_REPO_ID = "drbaph/ZONOS2-BF16"
-FP8_REPO_ID = "drbaph/ZONOS-FP8"
+FP8_REPO_ID = "drbaph/ZONOS2-FP8"
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,7 @@ PRESET_MODELS = {
         filename="zonos2-bf16.safetensors",
         repo_id=BF16_REPO_ID,
     ),
-    "ZONOS2 FP8 Mixed - drbaph/ZONOS-FP8": ModelPreset(
+    "ZONOS2 FP8 Mixed - drbaph/ZONOS2-FP8": ModelPreset(
         filename="zonos2-fp8-mixed.safetensors",
         repo_id=FP8_REPO_ID,
     ),

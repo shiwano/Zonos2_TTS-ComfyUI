@@ -1,7 +1,7 @@
 [project]
 name = "Zonos2_TTS-ComfyUI"
 description = "Native ComfyUI nodes for Zyphra ZONOS2 text-to-speech and voice cloning with AIMDO memory tracking"
-version = "0.1.6"
+version = "0.1.7"
 license = {file = "LICENSE"}
 dependencies = [
     "accelerate",
@@ -14,7 +14,7 @@ dependencies = [
 Repository = "https://github.com/Saganaki22/Zonos2_TTS-ComfyUI"
 ZONOS2 = "https://github.com/Zyphra/ZONOS2"
 Model = "https://huggingface.co/drbaph/ZONOS2-BF16"
-FP8Model = "https://huggingface.co/drbaph/ZONOS-FP8"
+FP8Model = "https://huggingface.co/drbaph/ZONOS2-FP8"
 
 [tool.comfy]
 PublisherId = "saganaki22"

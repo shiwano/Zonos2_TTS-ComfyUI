@@ -1,12 +1,12 @@
 # ZONOS2 TTS ComfyUI
 
-[![Version](https://img.shields.io/badge/version-0.1.6-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.1.7-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
 [![Official Model](https://img.shields.io/badge/Hugging_Face-Zyphra%2FZONOS2-ffd21e)](https://huggingface.co/Zyphra/ZONOS2)
 [![Native BF16 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--BF16-ffd21e)](https://huggingface.co/drbaph/ZONOS2-BF16)
-[![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS-FP8)
+[![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS2-FP8)
 [![Model License](https://img.shields.io/badge/Model_License-Apache--2.0-green)](https://huggingface.co/Zyphra/ZONOS2)
 
 [English README](README.md)
@@ -116,7 +116,7 @@ ComfyUI/models/zonos2/
 内置两个模型预设：
 
 - **ZONOS2 BF16** 从 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) 下载 `zonos2-bf16.safetensors` 和缺失的共享资产。
-- **ZONOS2 FP8 Mixed** 从 [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8) 下载 `zonos2-fp8-mixed.safetensors` 和缺失的共享资产。
+- **ZONOS2 FP8 Mixed** 从 [drbaph/ZONOS2-FP8](https://huggingface.co/drbaph/ZONOS2-FP8) 下载 `zonos2-fp8-mixed.safetensors` 和缺失的共享资产。
 
 所有下载都会独立检查，并在两个预设之间复用相同的本地目录：
 
@@ -259,11 +259,11 @@ ZONOS2 主模型、DAC 解码器和按需加载的说话人编码器都会作为
 
 **模型下拉菜单下载失败或返回 404**
 
-确认所选仓库包含根检查点以及 `dac_44khz/` 和 `speaker_encoder/`：BF16 使用 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16)，混合 FP8 使用 [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8)。上传尚未完成时，请求的文件可能暂时无法下载。已有的完整本地资产目录不会重复下载。
+确认所选仓库包含根检查点以及 `dac_44khz/` 和 `speaker_encoder/`：BF16 使用 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16)，混合 FP8 使用 [drbaph/ZONOS2-FP8](https://huggingface.co/drbaph/ZONOS2-FP8)。上传尚未完成时，请求的文件可能暂时无法下载。已有的完整本地资产目录不会重复下载。
 
 **FP8 提示格式不受支持或出现 3D linear 权重**
 
-请更新本自定义节点并完全重启 ComfyUI，让 Python 重新加载当前 FP8 格式。版本 0.1.6 会在推理前拒绝已淘汰的全层 FP8 布局和形状错误的专家张量。当前支持的是 `zonos2-fp8-mixed.safetensors` 使用的仅专家 gate/up FP8 布局。
+请更新本自定义节点并完全重启 ComfyUI，让 Python 重新加载当前 FP8 格式。版本 0.1.7 会在推理前拒绝已淘汰的全层 FP8 布局和形状错误的专家张量。当前支持的是 `zonos2-fp8-mixed.safetensors` 使用的仅专家 gate/up FP8 布局。
 
 **FlashAttention 不可用**
 
@@ -336,5 +336,5 @@ Apache-2.0 模型许可证与本项目的可接受使用政策彼此独立。无
 - [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2)
 - [Zyphra/ZONOS2 官方模型](https://huggingface.co/Zyphra/ZONOS2)
 - [ComfyUI 原生 BF16 模型包](https://huggingface.co/drbaph/ZONOS2-BF16)
-- [ComfyUI 混合 FP8 模型包](https://huggingface.co/drbaph/ZONOS-FP8)
+- [ComfyUI 混合 FP8 模型包](https://huggingface.co/drbaph/ZONOS2-FP8)
 - [Descript DAC 44.1 kHz](https://huggingface.co/descript/dac_44khz)

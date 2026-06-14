@@ -38,7 +38,7 @@ def test_loader_option_order():
 
 def test_model_catalog_routes_each_preset_to_its_own_repo():
     bf16 = resolve_model_source("ZONOS2 BF16 - drbaph/ZONOS2-BF16")
-    fp8 = resolve_model_source("ZONOS2 FP8 Mixed - drbaph/ZONOS-FP8")
+    fp8 = resolve_model_source("ZONOS2 FP8 Mixed - drbaph/ZONOS2-FP8")
 
     assert bf16.filename == "zonos2-bf16.safetensors"
     assert bf16.repo_id == BF16_REPO_ID
@@ -76,7 +76,7 @@ def test_missing_selected_model_downloads_even_when_assets_exist(
     monkeypatch.setattr(loader_module, "_download_model", fake_download)
 
     result = resolve_model_path(
-        "ZONOS2 FP8 Mixed - drbaph/ZONOS-FP8",
+        "ZONOS2 FP8 Mixed - drbaph/ZONOS2-FP8",
         download_if_missing=True,
     )
 
