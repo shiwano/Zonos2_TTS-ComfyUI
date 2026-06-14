@@ -77,6 +77,64 @@ def test_resume_registers_with_comfy_memory_manager(monkeypatch):
     assert calls == [patcher]
 
 
+def test_bundle_resume_batches_patchers(monkeypatch):
+    calls = []
+    patchers = [object(), object(), object()]
+    bundle = type(
+        "Bundle",
+        (),
+        {
+            "patchers": patchers,
+            "quantization": None,
+            "model": object(),
+        },
+    )()
+
+    monkeypatch.setattr(loader, "_register_many_with_comfy", calls.append)
+
+    loader.resume_bundle_to_device(bundle)
+
+    assert calls == [patchers]
+
+
+def test_comfy_registration_logs_only_new_patchers(monkeypatch):
+    import comfy.model_management as mm
+
+    class FakePatcher:
+        load_device = torch.device("cuda")
+
+        def __init__(self, name):
+            self.model = type(name, (), {})()
+
+        def is_dynamic(self):
+            return False
+
+    existing = FakePatcher("ExistingModel")
+    added = FakePatcher("AddedModel")
+    loaded = type("Loaded", (), {"model": existing})()
+    load_calls = []
+    messages = []
+
+    monkeypatch.setattr(mm, "current_loaded_models", [loaded])
+    monkeypatch.setattr(
+        mm,
+        "load_models_gpu",
+        lambda patchers: load_calls.append(patchers),
+    )
+    monkeypatch.setattr(
+        loader.logger,
+        "info",
+        lambda message, *args: messages.append(message % args),
+    )
+
+    loader._register_many_with_comfy([existing, added])
+
+    assert load_calls == [[existing, added]]
+    assert messages == [
+        "Loaded AddedModel through ComfyUI memory management.",
+    ]
+
+
 def test_dynamic_patcher_sees_each_moe_expert_as_separate_modules():
     from comfy.model_patcher import ModelPatcher
 

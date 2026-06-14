@@ -1,6 +1,6 @@
 # ZONOS2 TTS ComfyUI
 
-[![Version](https://img.shields.io/badge/version-0.1.5-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.1.6-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
@@ -263,7 +263,7 @@ ZONOS2 主模型、DAC 解码器和按需加载的说话人编码器都会作为
 
 **FP8 提示格式不受支持或出现 3D linear 权重**
 
-请更新本自定义节点并完全重启 ComfyUI，让 Python 重新加载当前 FP8 格式。版本 0.1.5 会在推理前拒绝已淘汰的全层 FP8 布局和形状错误的专家张量。当前支持的是 `zonos2-fp8-mixed.safetensors` 使用的仅专家 gate/up FP8 布局。
+请更新本自定义节点并完全重启 ComfyUI，让 Python 重新加载当前 FP8 格式。版本 0.1.6 会在推理前拒绝已淘汰的全层 FP8 布局和形状错误的专家张量。当前支持的是 `zonos2-fp8-mixed.safetensors` 使用的仅专家 gate/up FP8 布局。
 
 **FlashAttention 不可用**
 

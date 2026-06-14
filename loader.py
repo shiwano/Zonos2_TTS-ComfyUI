@@ -468,24 +468,38 @@ def _empty_accelerator_cache() -> None:
         torch.xpu.empty_cache()
 
 
-def _register_with_comfy(patcher: Any) -> None:
-    if patcher is None:
+def _register_many_with_comfy(patchers: list[Any]) -> None:
+    patchers = [
+        patcher
+        for patcher in patchers
+        if patcher is not None and patcher.load_device.type != "cpu"
+    ]
+    if not patchers:
         return
     try:
         import comfy.model_management as mm
 
-        if patcher.load_device.type == "cpu":
-            return
-        mm.load_models_gpu([patcher])
-        logger.info(
-            "Loaded %s through ComfyUI%s memory management.",
-            patcher.model.__class__.__name__,
-            "/AIMDO" if patcher.is_dynamic() else "",
-        )
+        already_loaded = {
+            id(loaded.model)
+            for loaded in mm.current_loaded_models
+            if loaded.model is not None
+        }
+        mm.load_models_gpu(patchers)
+        for patcher in patchers:
+            if id(patcher) not in already_loaded:
+                logger.info(
+                    "Loaded %s through ComfyUI%s memory management.",
+                    patcher.model.__class__.__name__,
+                    "/AIMDO" if patcher.is_dynamic() else "",
+                )
     except Exception as exc:
         raise RuntimeError(
             "Could not load ZONOS2 through ComfyUI memory management."
         ) from exc
+
+
+def _register_with_comfy(patcher: Any) -> None:
+    _register_many_with_comfy([patcher])
 
 
 def _unregister_from_comfy(patcher: Any) -> None:
@@ -561,8 +575,7 @@ def unload_runtime_module(patcher: Any, hard: bool = True) -> None:
 
 
 def resume_bundle_to_device(bundle: Zonos2Bundle) -> None:
-    for patcher in bundle.patchers:
-        resume_runtime_module(patcher, bundle.device)
+    _register_many_with_comfy(bundle.patchers)
     if bundle.quantization is not None and bundle.model is not None:
         validate_quantized_runtime_model(bundle.model)
 
@@ -658,7 +671,6 @@ def load_zonos2_bundle(
     )
 
     if _ACTIVE_BUNDLE is not None and _ACTIVE_LOAD_KEY == load_key:
-        resume_bundle_to_device(_ACTIVE_BUNDLE)
         return _ACTIVE_BUNDLE
     if _ACTIVE_BUNDLE is not None:
         unload_zonos2_bundle(

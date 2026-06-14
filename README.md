@@ -2,7 +2,7 @@
 
 ComfyUI custom nodes for [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2), with text-to-speech, audio-only voice cloning, SDPA and FlashAttention inference, native progress reporting, and ComfyUI/AIMDO memory management.
 
-[![Version](https://img.shields.io/badge/version-0.1.5-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.1.6-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
@@ -264,7 +264,7 @@ Confirm the selected repository contains its root checkpoint plus `dac_44khz/` a
 
 **FP8 reports an unsupported format or a 3D linear weight**
 
-Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.5 rejects the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
+Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.6 rejects the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
 
 **FlashAttention is unavailable**
 

@@ -285,7 +285,6 @@ def extract_speaker_embedding(
             "reference_audio must contain waveform and sample_rate."
         )
     encoder = ensure_speaker_encoder(bundle)
-    resume_bundle_to_device(bundle)
     embedding = encoder(waveform, int(sample_rate))
     if embedding.shape != (1, bundle.config.speaker_embedding_dim):
         raise RuntimeError(
@@ -312,9 +311,11 @@ def generate_zonos2_audio(
     if not text.strip():
         raise ValueError("Text cannot be empty.")
 
-    resume_bundle_to_device(bundle)
     codec = ensure_codec(bundle)
     speaker_embedding = None
+    if reference_audio is not None:
+        ensure_speaker_encoder(bundle)
+    resume_bundle_to_device(bundle)
     if reference_audio is not None:
         speaker_embedding = extract_speaker_embedding(bundle, reference_audio)
 
