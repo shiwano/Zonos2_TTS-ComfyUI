@@ -1,15 +1,20 @@
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 import torch
 
 from zonos2_tts_comfyui_test.loader import inspect_checkpoint_dtype
 from zonos2_tts_comfyui_test.native import (
+    QuantizedSonicExpert,
     SonicExperts,
+    TensorLinear,
+    Zonos2Model,
     build_native_model,
     build_prompt,
     checkpoint_layout,
     read_config,
+    validate_quantized_runtime_model,
     validate_checkpoint_layout,
 )
 
@@ -112,6 +117,78 @@ def test_moe_experts_are_independently_pageable():
         assert expert.w2_shape == (8, 12)
         assert expert.weight.shape == (24, 8)
         assert expert.bias.shape == (8, 12)
+
+
+def test_mixed_fp8_is_limited_to_expert_gate_up():
+    class MarkerLinear(torch.nn.Linear):
+        pass
+
+    class ExpertOperations:
+        Linear = MarkerLinear
+
+    config = replace(
+        read_config(ROOT / "assets" / "params.json"),
+        n_layers=3,
+        dim=8,
+        head_dim=4,
+        n_heads=2,
+        n_kv_heads=1,
+        intermediate_size=12,
+        speaker_embedding_dim=8,
+        speaker_lda_dim=4,
+        moe_n_experts=4,
+        moe_router_dim=4,
+        moe_start_from_layer=1,
+    )
+    model = Zonos2Model(
+        config,
+        expert_operations=ExpertOperations,
+        quantization="fp8_e4m3",
+    )
+
+    moe_layer = next(layer for layer in model.layers if layer.is_moe)
+
+    assert not isinstance(moe_layer.attention.wq, MarkerLinear)
+    assert isinstance(model.layers[0].feed_forward.w_in, TensorLinear)
+    expert = moe_layer.feed_forward.experts.experts[0]
+    assert isinstance(expert, QuantizedSonicExpert)
+    assert isinstance(expert.w13, MarkerLinear)
+    assert isinstance(expert.w2, MarkerLinear)
+    assert not isinstance(model.multi_output, MarkerLinear)
+
+
+def test_mixed_fp8_runtime_guard_rejects_3d_linear_weight():
+    class MarkerLinear(torch.nn.Linear):
+        pass
+
+    class ExpertOperations:
+        Linear = MarkerLinear
+
+    config = replace(
+        read_config(ROOT / "assets" / "params.json"),
+        n_layers=3,
+        dim=8,
+        head_dim=4,
+        n_heads=2,
+        n_kv_heads=1,
+        intermediate_size=12,
+        speaker_embedding_dim=8,
+        speaker_lda_dim=4,
+        moe_n_experts=4,
+        moe_router_dim=4,
+        moe_start_from_layer=1,
+    )
+    model = Zonos2Model(
+        config,
+        expert_operations=ExpertOperations,
+        quantization="fp8_e4m3",
+    )
+    moe_layer = next(layer for layer in model.layers if layer.is_moe)
+    expert = moe_layer.feed_forward.experts.experts[0]
+    expert.w13.weight = torch.nn.Parameter(torch.empty(1, 2, 2))
+
+    with pytest.raises(RuntimeError, match="shape=\\(1, 2, 2\\)"):
+        validate_quantized_runtime_model(model)
 
 
 def test_shared_token_path_stays_resident():

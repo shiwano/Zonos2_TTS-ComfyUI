@@ -1,11 +1,12 @@
 # ZONOS2 TTS ComfyUI
 
-[![Version](https://img.shields.io/badge/version-0.1.4-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.1.5-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
 [![Official Model](https://img.shields.io/badge/Hugging_Face-Zyphra%2FZONOS2-ffd21e)](https://huggingface.co/Zyphra/ZONOS2)
 [![Native BF16 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--BF16-ffd21e)](https://huggingface.co/drbaph/ZONOS2-BF16)
+[![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS-FP8)
 [![Model License](https://img.shields.io/badge/Model_License-Apache--2.0-green)](https://huggingface.co/Zyphra/ZONOS2)
 
 [English README](README.md)
@@ -40,6 +41,7 @@ ZONOS2 是 Zyphra 最新的文本转语音模型，使用超过 600 万小时的
 - 仅通过音频完成零样本声音克隆，无需参考文本。
 - 提供全部已发布的 ZONOS2 语速与音质条件桶。
 - 支持 `auto`、`bf16` 和 `fp16` 运行时数据类型。
+- 支持经过验证的 9.78 GiB 混合 FP8 检查点：MoE 专家 gate/up 使用 FP8 E4M3，敏感路径保留 BF16。
 - 自动选择 FlashAttention，并在不可用时回退到 PyTorch SDPA。
 - 原生 ComfyUI 进度条与 CLI 内联 `tqdm` 进度。
 - 将真实张量注册到 ComfyUI 模型管理与 AIMDO。
@@ -93,6 +95,7 @@ uv run python Zonos2_TTS-ComfyUI/install.py
 ```text
 ComfyUI/models/zonos2/
 ├── zonos2-bf16.safetensors
+├── zonos2-fp8-mixed.safetensors
 ├── dac_44khz/
 │   ├── .gitattributes
 │   ├── config.json
@@ -110,15 +113,28 @@ ComfyUI/models/zonos2/
     └── tokenizer_ecapa_tdnn.py
 ```
 
-预设加载器会从 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) 下载全部三个资产：
+内置两个模型预设：
 
-- 选择预设时下载 `zonos2-bf16.safetensors`。
-- 首次加载模型包时下载 `dac_44khz/`。
-- 首次使用声音克隆时按需下载 `speaker_encoder/`。
+- **ZONOS2 BF16** 从 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) 下载 `zonos2-bf16.safetensors` 和缺失的共享资产。
+- **ZONOS2 FP8 Mixed** 从 [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8) 下载 `zonos2-fp8-mixed.safetensors` 和缺失的共享资产。
 
-启用 `download_if_missing` 后允许自动下载。若要完全离线运行，请先将所有必要资产放入上述路径，然后关闭此选项。
+所有下载都会独立检查，并在两个预设之间复用相同的本地目录：
 
-节点自带官方架构配置 `assets/params.json`，加载时始终使用它验证检查点中的名称和形状。手动加入的 `.safetensors` 文件也会出现在模型下拉列表中。
+- 即使 `dac_44khz/` 和 `speaker_encoder/` 已存在，只要当前选择的根检查点缺失，仍会下载该检查点。
+- 完整的本地 `dac_44khz/` 会直接复用，不会重复下载。
+- 完整的本地 `speaker_encoder/` 会直接复用，不会重复下载。
+- DAC 在模型包加载时检查；说话人编码器仅在首次使用声音克隆时按需检查。
+
+启用 `download_if_missing` 后只会下载缺失的部分。若要完全离线运行，请先将所有必要资产放入上述路径，然后关闭此选项。
+
+节点自带官方架构配置 `assets/params.json`。BF16 检查点会按原生架构验证；混合 FP8 检查点会在推理前验证格式元数据、量化策略、ComfyUI 必需的量化张量及运行时权重形状。手动加入的 `.safetensors` 文件也会出现在模型下拉列表中。
+
+混合 FP8 使用保守的量化策略：
+
+- FP8 E4M3：MoE 专家 gate/up（`w13`）投影。
+- BF16：注意力、普通 FFN、专家 down（`w2`）、LM head、路由器、嵌入、归一化、说话人投影、偏置和温度参数。
+
+该策略将主检查点从约 14.28 GiB 降至 9.78 GiB，同时保护在更广泛 FP8 转换中容易失效的路径。FP8 的主要目标是节省内存，并不保证比 BF16 生成更快。
 
 请将完整的 `dac_44khz/` 和 `speaker_encoder/` 目录上传到模型仓库，不要按照简化目录树手动重建。运行时，DAC 直接需要 `config.json` 和 `model.safetensors`。说话人编码器通过 Transformers 远程代码机制加载，因此直接需要 `config.json`、`model.safetensors`、`configuration_ecapa_tdnn.py` 和 `modeling_ecapa_tdnn.py`。预处理器、特征提取器、分词器、README 和 Git 元数据文件不由当前节点推理路径直接调用，但保留完整上游目录能够维持一个有效且可复用的 Hugging Face 模型包。
 
@@ -131,10 +147,10 @@ ComfyUI/models/zonos2/
 
 | 输入 | 默认值 | 可选值 | 说明 |
 |---|---|---|---|
-| `model` | ZONOS2 BF16 预设 | 预设与本地 safetensors | 从 `ComfyUI/models/zonos2` 加载。 |
-| `dtype` | `auto` | `auto`、`bf16`、`fp16` | `auto` 保留检查点数据类型；显式选择会在加载时转换浮点张量。 |
+| `model` | ZONOS2 BF16 预设 | BF16 预设、混合 FP8 预设与本地 safetensors | 从 `ComfyUI/models/zonos2` 加载；每个预设从其对应的 Hugging Face 仓库下载。 |
+| `dtype` | `auto` | `auto`、`bf16`、`fp16` | `auto` 保留普通检查点的数据类型，并根据混合 FP8 元数据自动使用 BF16 计算。混合 FP8 仅接受 `auto` 或 `bf16`，拒绝 `fp16`。 |
 | `attention` | `auto` | `auto`、`SDPA`、`flash_attention` | `auto` 在兼容时使用 FlashAttention，否则使用 SDPA。 |
-| `download_if_missing` | `true` | 布尔值 | 下载缺失的检查点、DAC 和说话人编码器。 |
+| `download_if_missing` | `true` | 布尔值 | 独立下载缺失的所选检查点、DAC 或说话人编码器；已有共享目录会直接复用。 |
 
 模型、数据类型或注意力后端发生变化时，节点会先硬卸载旧模型，再加载新模型。
 
@@ -217,12 +233,14 @@ ComfyUI/models/zonos2/
 ZONOS2 主模型、DAC 解码器和按需加载的说话人编码器都会作为真实 PyTorch 模块注册到 ComfyUI 模型管理。
 
 - BF16 主模型的估算大小约为 14.324 GiB。加载器额外保留 3 GiB 运行余量，因此自动选择 AIMDO 的总显存分界线约为 17.324 GiB。
+- 混合 FP8 主模型约为 9.78 GiB，对应的自动 AIMDO 总显存分界线约为 12.78 GiB。
+- 使用 `dtype: auto` 时，混合 FP8 保留 FP8 专家存储，并依据检查点元数据选择 BF16 计算。原生 FP8 执行需要当前版本的 ComfyUI/comfy-kitchen 和兼容硬件；不支持的硬件会使用 ComfyUI 的兼容反量化回退，速度可能更慢。
 - 启用 AIMDO DynamicVRAM 后，低于该分界线的 GPU（包括常见的 8 GiB、12 GiB 和 16 GiB 显卡）会使用 ComfyUI 真实的 `CoreModelPatcher` 与 AIMDO VBAR 路径。
 - 在动态路径中，主模型的大型 MoE 专家权重保持文件映射，并仅按需将实际选中的专家分页到显存。VBAR 分配、缺页载入、驻留和驱逐都是真实的 AIMDO 操作，并非可视化模拟。
 - 当 GPU 总显存足以容纳估算模型并保留 3 GiB 余量时，会使用静态 GPU 路径。这样不会保留 CPU 模型后备，并可直接执行 CUDA 专家计算。
 - 自动选择依据是 GPU 的总显存容量，而不是当时的空闲显存。因此，即使 24 GiB 或 32 GiB 显卡已有其他模型占用部分显存，仍会选择静态路径；ComfyUI 可能会卸载其他模型以腾出空间。
 - 在动态路径中，共享注意力、路由、嵌入和输出权重保持常驻，以避免逐 token 的额外分页开销。
-- 每个专家的 `w13` 和 `w2` 投影共享一个可分页分配，因此只有实际路由到的专家需要进入显存，并且 AIMDO 每个专家只需执行一次驻留检查。
+- 每个专家的 FP8 `w13` 与 BF16 `w2` 投影都可由 AIMDO 独立分页，因此只有实际被路由专家的投影需要进入显存。由于两者存储格式不同，它们使用独立的 VBAR 分配。
 - 较小的 DAC 和说话人编码器使用 ComfyUI 标准静态补丁器，因此 Memory Visualization 会根据真实已加载大小将它们显示为橙色静态显存行。
 - 未启用 AIMDO 的系统无论 GPU 容量如何，都会使用 ComfyUI 标准静态模型补丁器，并将权重直接加载到所选设备。
 - 主模型的 AIMDO 显示条反映真实专家页面驻留状态，并随页面载入或驱逐实时更新。
@@ -241,7 +259,11 @@ ZONOS2 主模型、DAC 解码器和按需加载的说话人编码器都会作为
 
 **模型下拉菜单下载失败或返回 404**
 
-确认 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) 中已经包含 `zonos2-bf16.safetensors`、`dac_44khz/` 和 `speaker_encoder/`。上传尚未完成时，部分文件可能暂时无法下载。
+确认所选仓库包含根检查点以及 `dac_44khz/` 和 `speaker_encoder/`：BF16 使用 [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16)，混合 FP8 使用 [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8)。上传尚未完成时，请求的文件可能暂时无法下载。已有的完整本地资产目录不会重复下载。
+
+**FP8 提示格式不受支持或出现 3D linear 权重**
+
+请更新本自定义节点并完全重启 ComfyUI，让 Python 重新加载当前 FP8 格式。版本 0.1.5 会在推理前拒绝已淘汰的全层 FP8 布局和形状错误的专家张量。当前支持的是 `zonos2-fp8-mixed.safetensors` 使用的仅专家 gate/up FP8 布局。
 
 **FlashAttention 不可用**
 
@@ -314,4 +336,5 @@ Apache-2.0 模型许可证与本项目的可接受使用政策彼此独立。无
 - [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2)
 - [Zyphra/ZONOS2 官方模型](https://huggingface.co/Zyphra/ZONOS2)
 - [ComfyUI 原生 BF16 模型包](https://huggingface.co/drbaph/ZONOS2-BF16)
+- [ComfyUI 混合 FP8 模型包](https://huggingface.co/drbaph/ZONOS-FP8)
 - [Descript DAC 44.1 kHz](https://huggingface.co/descript/dac_44khz)

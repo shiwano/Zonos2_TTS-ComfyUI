@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import torch
 import torch.nn as nn
@@ -30,8 +30,10 @@ def _linear(
     in_features: int,
     out_features: int,
     bias: bool = True,
+    operations: Any = None,
 ) -> nn.Module:
-    return nn.Linear(
+    linear_class = operations.Linear if operations is not None else nn.Linear
+    return linear_class(
         in_features,
         out_features,
         bias=bias,
@@ -294,7 +296,11 @@ class Attention(nn.Module):
             torch.empty(1, config.n_heads, 1),
             requires_grad=False,
         )
-        self.gater = _linear(config.dim, config.n_heads, bias=False)
+        self.gater = _linear(
+            config.dim,
+            config.n_heads,
+            bias=False,
+        )
 
         inv_freq = 1.0 / (
             config.rope_theta
@@ -499,11 +505,39 @@ class SonicExpert(nn.Module):
             uncast_bias_weight(self, weight, bias, offload_stream)
 
 
+class QuantizedSonicExpert(nn.Module):
+    def __init__(self, config: Zonos2Config, operations: Any):
+        super().__init__()
+        self.w13 = _linear(
+            config.dim,
+            config.intermediate_size * 2,
+            bias=False,
+            operations=operations,
+        )
+        self.w2 = _linear(
+            config.intermediate_size,
+            config.dim,
+            bias=False,
+            operations=operations,
+        )
+        self.intermediate_size = config.intermediate_size
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        fused = self.w13(x)
+        gate = fused[..., 0::2]
+        up = fused[..., 1::2]
+        return self.w2(F.silu(gate) * up)
+
+
 class SonicExperts(nn.Module):
-    def __init__(self, config: Zonos2Config):
+    def __init__(self, config: Zonos2Config, operations: Any = None):
         super().__init__()
         self.experts = nn.ModuleList(
-            SonicExpert(config)
+            (
+                QuantizedSonicExpert(config, operations)
+                if operations is not None
+                else SonicExpert(config)
+            )
             for _ in range(config.moe_n_experts)
         )
         self.num_experts = config.moe_n_experts
@@ -639,10 +673,15 @@ class Router(nn.Module):
 
 
 class MoEFeedForward(nn.Module):
-    def __init__(self, config: Zonos2Config, layer_id: int):
+    def __init__(
+        self,
+        config: Zonos2Config,
+        layer_id: int,
+        operations: Any = None,
+    ):
         super().__init__()
         self.router = Router(config, layer_id)
-        self.experts = SonicExperts(config)
+        self.experts = SonicExperts(config, operations=operations)
 
     def forward(
         self,
@@ -664,14 +703,19 @@ class MoEFeedForward(nn.Module):
 
 
 class TransformerBlock(nn.Module):
-    def __init__(self, config: Zonos2Config, layer_id: int):
+    def __init__(
+        self,
+        config: Zonos2Config,
+        layer_id: int,
+        expert_operations: Any = None,
+    ):
         super().__init__()
         self.attention = Attention(config)
         self.attention_norm = RMSNorm(config.dim, config.norm_eps)
         self.ffn_norm = RMSNorm(config.dim, config.norm_eps)
         self.is_moe = config.is_moe_layer(layer_id)
         self.feed_forward = (
-            MoEFeedForward(config, layer_id)
+            MoEFeedForward(config, layer_id, operations=expert_operations)
             if self.is_moe
             else DenseFeedForward(config)
         )
@@ -701,10 +745,16 @@ class TransformerBlock(nn.Module):
 
 
 class Zonos2Model(nn.Module):
-    def __init__(self, config: Zonos2Config):
+    def __init__(
+        self,
+        config: Zonos2Config,
+        expert_operations: Any = None,
+        quantization: str | None = None,
+    ):
         super().__init__()
         self.config = config
         self.runtime_dtype: torch.dtype | None = None
+        self.quantization = quantization
         self.multi_embedder = MultiEmbedding(config)
         if config.speaker_enabled and config.speaker_lda_dim is not None:
             self.speaker_lda_projection = _linear(
@@ -722,7 +772,14 @@ class Zonos2Model(nn.Module):
             else None
         )
         self.layers = nn.ModuleList(
-            [TransformerBlock(config, index) for index in range(config.n_layers)]
+            [
+                TransformerBlock(
+                    config,
+                    index,
+                    expert_operations=expert_operations,
+                )
+                for index in range(config.n_layers)
+            ]
         )
         self.out_norm = RMSNorm(config.dim, config.norm_eps)
         self.multi_output = _linear(
@@ -813,9 +870,69 @@ class Zonos2Model(nn.Module):
         return logits
 
 
-def build_native_model(config: Zonos2Config) -> Zonos2Model:
+def _quantized_operations(
+    quantization: str,
+    compute_dtype: torch.dtype,
+    load_device: torch.device,
+) -> Any:
+    try:
+        import comfy.model_management as mm
+        from comfy.ops import mixed_precision_ops
+        from comfy.quant_ops import QUANT_ALGOS
+    except ImportError as exc:
+        raise RuntimeError(
+            "Quantized ZONOS2 checkpoints require a current ComfyUI "
+            "installation."
+        ) from exc
+
+    disabled: set[str] = set()
+    if quantization != "fp8_e4m3":
+        raise ValueError(f"Unsupported ZONOS2 quantization: {quantization}")
+    if "float8_e4m3fn" not in QUANT_ALGOS:
+        raise RuntimeError(
+            "This ComfyUI installation does not provide FP8 E4M3 quantized "
+            "tensor support. Update ComfyUI and comfy-kitchen, then restart "
+            "ComfyUI."
+        )
+    supports_fp8_compute = getattr(mm, "supports_fp8_compute", None)
+    if supports_fp8_compute is None:
+        raise RuntimeError(
+            "This ComfyUI installation is too old for guarded FP8 execution. "
+            "Update ComfyUI and restart it."
+        )
+    if not supports_fp8_compute(load_device):
+        disabled.add("float8_e4m3fn")
+        logger.warning(
+            "Native FP8 E4M3 compute is unavailable on %s; ComfyUI will "
+            "dequantize FP8 weights for compatible fallback execution.",
+            load_device,
+        )
+    return mixed_precision_ops(
+        {"mixed_ops": True},
+        compute_dtype=compute_dtype,
+        disabled=disabled,
+    )
+
+
+def build_native_model(
+    config: Zonos2Config,
+    quantization: str | None = None,
+    compute_dtype: torch.dtype = torch.bfloat16,
+    load_device: torch.device = torch.device("cpu"),
+) -> Zonos2Model:
+    expert_operations = None
+    if quantization is not None:
+        expert_operations = _quantized_operations(
+            quantization,
+            compute_dtype,
+            load_device,
+        )
     with torch.device("meta"):
-        model = Zonos2Model(config)
+        model = Zonos2Model(
+            config,
+            expert_operations=expert_operations,
+            quantization=quantization,
+        )
     return model
 
 
@@ -829,6 +946,51 @@ def set_runtime_dtype(model: Zonos2Model, dtype: torch.dtype) -> None:
         for name, value in module.named_buffers(recurse=False):
             if value.is_floating_point():
                 setattr(module, f"{name}_comfy_model_dtype", dtype)
+
+
+def validate_quantized_runtime_model(model: Zonos2Model) -> None:
+    if model.quantization != "fp8_e4m3":
+        return
+
+    expert_count = 0
+    invalid: list[str] = []
+    for layer_index, layer in enumerate(model.layers):
+        if not layer.is_moe:
+            continue
+        for expert_index, expert in enumerate(
+            layer.feed_forward.experts.experts
+        ):
+            expert_count += 1
+            if not isinstance(expert, QuantizedSonicExpert):
+                invalid.append(
+                    f"layers.{layer_index}.expert.{expert_index}: "
+                    f"{expert.__class__.__name__}"
+                )
+                continue
+            for projection_name in ("w13", "w2"):
+                projection = getattr(expert, projection_name)
+                weight = projection.weight
+                if weight.ndim != 2:
+                    invalid.append(
+                        f"layers.{layer_index}.expert.{expert_index}."
+                        f"{projection_name}.weight shape={tuple(weight.shape)}"
+                    )
+                if not hasattr(projection, "comfy_cast_weights"):
+                    invalid.append(
+                        f"layers.{layer_index}.expert.{expert_index}."
+                        f"{projection_name} is not AIMDO-pageable"
+                    )
+
+    if expert_count == 0:
+        invalid.append("no MoE experts found")
+    if invalid:
+        raise RuntimeError(
+            "ZONOS2 mixed FP8 runtime validation failed before inference. "
+            "This usually means ComfyUI is still using an older custom-node "
+            "module or the checkpoint was produced by the retired all-layer "
+            "FP8 converter. Fully restart ComfyUI and recreate the checkpoint "
+            f"if needed. Invalid entries: {invalid[:5]}"
+        )
 
 
 def _sonic_expert_modules(
@@ -1009,6 +1171,81 @@ def load_native_weights(
     if meta:
         raise RuntimeError(f"ZONOS2 load left meta tensors: {meta[:10]}")
     logger.info("Loaded all %d ZONOS2 checkpoint tensors.", len(expected_names))
+
+
+def load_quantized_weights(
+    model: Zonos2Model,
+    checkpoint_path: Path,
+    device: torch.device,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> int:
+    state_dict: dict[str, torch.Tensor] = {}
+    with safe_open(str(checkpoint_path), framework="pt", device="cpu") as handle:
+        names = sorted(handle.keys())
+        terminal_progress = (
+            tqdm(
+                total=len(names),
+                desc="Loading quantized ZONOS2 weights",
+                unit="tensor",
+                dynamic_ncols=True,
+                leave=True,
+            )
+            if tqdm is not None
+            else None
+        )
+        try:
+            for index, name in enumerate(names, start=1):
+                state_dict[name] = handle.get_tensor(name)
+                if terminal_progress is not None:
+                    terminal_progress.update(1)
+                if progress_callback is not None:
+                    progress_callback(index, len(names))
+                if terminal_progress is None and (
+                    index == 1 or index % 64 == 0 or index == len(names)
+                ):
+                    logger.info(
+                        "Loading quantized ZONOS2 weights %d/%d",
+                        index,
+                        len(names),
+                    )
+
+            incompatible = model.load_state_dict(
+                state_dict,
+                strict=False,
+                assign=True,
+            )
+        finally:
+            if terminal_progress is not None:
+                terminal_progress.close()
+
+    if incompatible.missing_keys or incompatible.unexpected_keys:
+        raise RuntimeError(
+            "Quantized ZONOS2 checkpoint does not match the native "
+            "architecture. "
+            f"Missing={incompatible.missing_keys[:10]}, "
+            f"unexpected={incompatible.unexpected_keys[:10]}"
+        )
+
+    model.eval()
+    model.materialize_runtime_buffers(device)
+    for parameter in model.parameters():
+        parameter.requires_grad_(False)
+    meta = [
+        name
+        for name, value in model.state_dict().items()
+        if value.device.type == "meta"
+    ]
+    meta.extend(
+        name
+        for name, value in model.named_buffers()
+        if value.device.type == "meta"
+    )
+    if meta:
+        raise RuntimeError(
+            f"Quantized ZONOS2 load left meta tensors: {meta[:10]}"
+        )
+    logger.info("Loaded all %d quantized ZONOS2 checkpoint tensors.", len(names))
+    return len(names)
 
 
 def text_to_byte_ids(text: str) -> list[int]:

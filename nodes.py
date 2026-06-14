@@ -348,14 +348,14 @@ class Zonos2ModelLoader:
                 "model": (
                     get_model_choices(),
                     {
-                        "tooltip": "Checkpoint in ComfyUI/models/zonos2.",
+                        "tooltip": "Checkpoint in ComfyUI/models/zonos2. The BF16 and mixed FP8 presets download from their own Hugging Face repositories. Mixed FP8 is detected from metadata and uses FP8 only for MoE expert gate/up weights.",
                     },
                 ),
                 "dtype": (
                     DTYPE_OPTIONS,
                     {
                         "default": "auto",
-                        "tooltip": "Runtime weight dtype. Auto preserves the checkpoint dtype; bf16 or fp16 casts floating tensors while loading. Changing this setting hard-unloads the previous bundle.",
+                        "tooltip": "Runtime weight dtype. Auto preserves a standard checkpoint's dtype and uses BF16 compute for mixed FP8. Mixed FP8 accepts auto or bf16, not fp16. Changing this setting hard-unloads the previous bundle.",
                     },
                 ),
                 "attention": (
@@ -369,7 +369,7 @@ class Zonos2ModelLoader:
                     "BOOLEAN",
                     {
                         "default": True,
-                        "tooltip": "When enabled, download a missing selected checkpoint, the DAC decoder, and the voice-clone speaker encoder from Hugging Face. When disabled, every required asset must already exist under ComfyUI/models/zonos2.",
+                        "tooltip": "When enabled, independently download only missing assets from the selected preset's Hugging Face repository. An existing DAC or speaker encoder is reused, while a missing selected checkpoint is still downloaded. When disabled, every required asset must already exist under ComfyUI/models/zonos2.",
                     },
                 ),
             }

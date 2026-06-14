@@ -17,23 +17,48 @@ from .native import (
     Zonos2Model,
     build_native_model,
     load_native_weights,
+    load_quantized_weights,
     read_config,
     set_runtime_dtype,
+    validate_quantized_runtime_model,
     validate_checkpoint_layout,
 )
 
 logger = logging.getLogger("Zonos2_TTS-ComfyUI")
 
 MODEL_FOLDER_NAME = "zonos2"
-MODEL_REPO_ID = "drbaph/ZONOS2-BF16"
+BF16_REPO_ID = "drbaph/ZONOS2-BF16"
+FP8_REPO_ID = "drbaph/ZONOS-FP8"
+
+
+@dataclass(frozen=True)
+class ModelPreset:
+    filename: str
+    repo_id: str
+
+
 PRESET_MODELS = {
-    "ZONOS2 BF16 - drbaph/ZONOS2-BF16": "zonos2-bf16.safetensors",
+    "ZONOS2 BF16 - drbaph/ZONOS2-BF16": ModelPreset(
+        filename="zonos2-bf16.safetensors",
+        repo_id=BF16_REPO_ID,
+    ),
+    "ZONOS2 FP8 Mixed - drbaph/ZONOS-FP8": ModelPreset(
+        filename="zonos2-fp8-mixed.safetensors",
+        repo_id=FP8_REPO_ID,
+    ),
 }
 ASSETS_DIR = Path(__file__).resolve().parent / "assets"
 PARAMS_PATH = ASSETS_DIR / "params.json"
 
 DTYPE_OPTIONS = ["auto", "bf16", "fp16"]
 ATTENTION_OPTIONS = ["auto", "SDPA", "flash_attention"]
+FP8_E4M3_FORMAT = "zonos2_fp8_e4m3_expert_gate_up_v1"
+LEGACY_FP8_E4M3_FORMAT = "zonos2_fp8_e4m3_mixed_v1"
+FP8_E4M3_POLICY = (
+    "expert_gate_up=fp8_e4m3;"
+    "attention+dense_ffn+expert_down+lm_head+router+embeddings+"
+    "norms+speaker+biases=bf16"
+)
 
 _ACTIVE_BUNDLE: "Zonos2Bundle | None" = None
 _ACTIVE_LOAD_KEY: tuple[Any, ...] | None = None
@@ -49,6 +74,8 @@ class Zonos2Bundle:
     dtype_name: str
     attention: str
     download_if_missing: bool
+    asset_repo_id: str
+    quantization: str | None = None
     patchers: list[Any] = field(default_factory=list)
     codec: Any = None
     speaker_encoder: Any = None
@@ -107,17 +134,27 @@ def get_model_choices() -> list[str]:
         if path.is_file() and path.suffix.lower() in {".safetensors", ".sft"}
     )
     choices = list(PRESET_MODELS)
-    preset_files = set(PRESET_MODELS.values())
+    preset_files = {preset.filename for preset in PRESET_MODELS.values()}
     choices.extend(name for name in local if name not in preset_files)
     return choices
 
 
-def _download_model(filename: str) -> Path:
+def resolve_model_source(model_choice: str) -> ModelPreset:
+    return PRESET_MODELS.get(
+        model_choice,
+        ModelPreset(
+            filename=Path(model_choice).name,
+            repo_id=BF16_REPO_ID,
+        ),
+    )
+
+
+def _download_model(filename: str, repo_id: str) -> Path:
     from huggingface_hub import hf_hub_download
 
-    logger.info("Downloading %s from %s.", filename, MODEL_REPO_ID)
+    logger.info("Downloading %s from %s.", filename, repo_id)
     downloaded = hf_hub_download(
-        repo_id=MODEL_REPO_ID,
+        repo_id=repo_id,
         filename=filename,
         local_dir=str(model_dir()),
     )
@@ -125,15 +162,15 @@ def _download_model(filename: str) -> Path:
 
 
 def resolve_model_path(model_choice: str, download_if_missing: bool) -> Path:
-    filename = PRESET_MODELS.get(model_choice, Path(model_choice).name)
-    path = model_dir() / filename
+    source = resolve_model_source(model_choice)
+    path = model_dir() / source.filename
     if path.is_file():
         return path
     if download_if_missing:
-        return _download_model(filename)
+        return _download_model(source.filename, source.repo_id)
     raise FileNotFoundError(
         f"ZONOS2 model not found at {path}. Enable download_if_missing or "
-        f"place {filename} in {model_dir()}."
+        f"place {source.filename} in {model_dir()}."
     )
 
 
@@ -161,12 +198,160 @@ def inspect_checkpoint_dtype(checkpoint_path: Path) -> torch.dtype:
     return next(iter(floating_dtypes))
 
 
+def inspect_checkpoint_quantization(checkpoint_path: Path) -> str | None:
+    with safe_open(str(checkpoint_path), framework="pt", device="cpu") as handle:
+        metadata = handle.metadata() or {}
+        format_name = metadata.get("zonos2_quantization")
+        if format_name == FP8_E4M3_FORMAT:
+            return "fp8_e4m3"
+        if format_name == LEGACY_FP8_E4M3_FORMAT:
+            raise ValueError(
+                "This ZONOS2 FP8 checkpoint uses the retired all-layer mixed "
+                "FP8 layout, which can produce invalid 3D linear weights and "
+                "immediate EOS. Recreate it with the current expert-gate/up-only "
+                "converter. If the file was already recreated, fully restart "
+                "ComfyUI so it reloads this custom node."
+            )
+        if format_name:
+            raise ValueError(
+                f"Unsupported ZONOS2 quantization format: {format_name}. "
+                "Update this custom node and fully restart ComfyUI. If the "
+                "error remains, recreate the checkpoint with the matching "
+                "converter."
+            )
+        if any(name.endswith(".comfy_quant") for name in handle.keys()):
+            raise ValueError(
+                "This checkpoint contains ComfyUI quantization markers but "
+                "does not identify a supported ZONOS2 quantization format."
+            )
+    return None
+
+
+def validate_quantized_checkpoint(checkpoint_path: Path) -> None:
+    with safe_open(str(checkpoint_path), framework="pt", device="cpu") as handle:
+        metadata = handle.metadata() or {}
+        policy = metadata.get("quantization_policy")
+        if policy != FP8_E4M3_POLICY:
+            raise ValueError(
+                "The ZONOS2 FP8 checkpoint has an incompatible quantization "
+                f"policy: {policy!r}. Expected expert gate/up FP8 with all "
+                "shared and sensitive paths in BF16. Recreate the checkpoint "
+                "with the current converter."
+            )
+        if metadata.get("compute_dtype") != "bfloat16":
+            raise ValueError(
+                "The ZONOS2 FP8 checkpoint must declare bfloat16 compute."
+            )
+
+        names = set(handle.keys())
+        quantized_weights = sorted(
+            name
+            for name in names
+            if name.endswith(".w13.weight")
+            and ".feed_forward.experts.experts." in name
+        )
+        if not quantized_weights:
+            raise ValueError(
+                "The ZONOS2 FP8 checkpoint contains no quantized expert "
+                "gate/up weights."
+            )
+
+        declared_count = metadata.get("quantized_modules")
+        if declared_count is not None and int(declared_count) != len(
+            quantized_weights
+        ):
+            raise ValueError(
+                "The ZONOS2 FP8 checkpoint metadata declares "
+                f"{declared_count} quantized modules, but "
+                f"{len(quantized_weights)} were found."
+            )
+
+        for weight_name in quantized_weights:
+            tensor_slice = handle.get_slice(weight_name)
+            if (
+                len(tensor_slice.get_shape()) != 2
+                or str(tensor_slice.get_dtype()).upper() != "F8_E4M3"
+            ):
+                raise ValueError(
+                    f"{weight_name} must be a 2D FP8 E4M3 tensor, got "
+                    f"shape={tensor_slice.get_shape()} "
+                    f"dtype={tensor_slice.get_dtype()}."
+                )
+            prefix = weight_name[: -len(".weight")]
+            required = {
+                f"{prefix}.comfy_quant",
+                f"{prefix}.weight_scale",
+            }
+            missing = sorted(required - names)
+            if missing:
+                raise ValueError(
+                    f"{weight_name} is missing ComfyUI quantization metadata: "
+                    f"{missing}."
+                )
+
+        unexpected_markers = sorted(
+            name
+            for name in names
+            if name.endswith(".comfy_quant")
+            and ".feed_forward.experts.experts." not in name
+        )
+        if unexpected_markers:
+            raise ValueError(
+                "Only MoE expert gate/up weights may be FP8 in this format. "
+                f"Unexpected quantized modules: {unexpected_markers[:5]}."
+            )
+
+
+def estimate_checkpoint_storage_bytes(checkpoint_path: Path) -> int:
+    dtype_sizes = {
+        "BOOL": 1,
+        "U8": 1,
+        "I8": 1,
+        "F8_E4M3": 1,
+        "F8_E5M2": 1,
+        "F8_E8M0": 1,
+        "I16": 2,
+        "U16": 2,
+        "F16": 2,
+        "BF16": 2,
+        "I32": 4,
+        "U32": 4,
+        "F32": 4,
+        "I64": 8,
+        "U64": 8,
+        "F64": 8,
+    }
+    total = 0
+    with safe_open(str(checkpoint_path), framework="pt", device="cpu") as handle:
+        for name in handle.keys():
+            tensor_slice = handle.get_slice(name)
+            dtype_name = str(tensor_slice.get_dtype()).upper()
+            item_size = dtype_sizes.get(dtype_name)
+            if item_size is None:
+                raise ValueError(
+                    f"Cannot estimate storage for {name} with dtype {dtype_name}."
+                )
+            numel = 1
+            for dimension in tensor_slice.get_shape():
+                numel *= int(dimension)
+            total += numel * item_size
+    return total
+
+
 def resolve_dtype(
     dtype_name: str,
     checkpoint_path: Path,
     device: torch.device,
 ) -> torch.dtype:
-    if dtype_name == "auto":
+    quantization = inspect_checkpoint_quantization(checkpoint_path)
+    if quantization == "fp8_e4m3" and dtype_name == "fp16":
+        raise ValueError(
+            "The ZONOS2 mixed FP8 E4M3 checkpoint requires dtype auto or bf16 "
+            "because routers, embeddings, norms, and compute remain BF16."
+        )
+    if quantization == "fp8_e4m3" and dtype_name == "auto":
+        dtype = torch.bfloat16
+    elif dtype_name == "auto":
         dtype = inspect_checkpoint_dtype(checkpoint_path)
     elif dtype_name == "bf16":
         dtype = torch.bfloat16
@@ -216,13 +401,15 @@ def should_use_dynamic_vram(
     model: torch.nn.Module,
     device: torch.device,
     dtype: torch.dtype,
+    model_bytes: int | None = None,
 ) -> bool:
     if not dynamic_vram_active(device):
         return False
     if torch.device(device).type != "cuda":
         return True
     total_vram = torch.cuda.get_device_properties(device).total_memory
-    model_bytes = estimate_runtime_model_bytes(model, dtype)
+    if model_bytes is None:
+        model_bytes = estimate_runtime_model_bytes(model, dtype)
     reserve = 3 * 1024**3
     return model_bytes + reserve > total_vram
 
@@ -376,6 +563,8 @@ def unload_runtime_module(patcher: Any, hard: bool = True) -> None:
 def resume_bundle_to_device(bundle: Zonos2Bundle) -> None:
     for patcher in bundle.patchers:
         resume_runtime_module(patcher, bundle.device)
+    if bundle.quantization is not None and bundle.model is not None:
+        validate_quantized_runtime_model(bundle.model)
 
 
 def add_bundle_module(
@@ -449,8 +638,12 @@ def load_zonos2_bundle(
     global _ACTIVE_BUNDLE, _ACTIVE_LOAD_KEY
 
     register_model_folder()
+    model_source = resolve_model_source(model_choice)
     checkpoint_path = resolve_model_path(model_choice, download_if_missing)
     device = resolve_device()
+    quantization = inspect_checkpoint_quantization(checkpoint_path)
+    if quantization is not None:
+        validate_quantized_checkpoint(checkpoint_path)
     torch_dtype = resolve_dtype(dtype_name, checkpoint_path, device)
     runtime_attention = resolve_attention(attention, device, torch_dtype)
     stat = checkpoint_path.stat()
@@ -461,6 +654,7 @@ def load_zonos2_bundle(
         str(device),
         str(torch_dtype),
         runtime_attention,
+        quantization,
     )
 
     if _ACTIVE_BUNDLE is not None and _ACTIVE_LOAD_KEY == load_key:
@@ -474,41 +668,78 @@ def load_zonos2_bundle(
         )
 
     config = read_bundled_config()
-    model = build_native_model(config)
-    count, missing, unexpected = validate_checkpoint_layout(
-        model,
-        checkpoint_path,
+    model = build_native_model(
+        config,
+        quantization=quantization,
+        compute_dtype=torch_dtype,
+        load_device=device,
     )
-    if missing or unexpected:
-        raise RuntimeError(
-            f"ZONOS2 checkpoint does not match bundled params.json. "
-            f"Missing={sorted(missing)[:10]}, "
-            f"unexpected={sorted(unexpected)[:10]}"
+    if quantization is None:
+        count, missing, unexpected = validate_checkpoint_layout(
+            model,
+            checkpoint_path,
         )
+        if missing or unexpected:
+            raise RuntimeError(
+                f"ZONOS2 checkpoint does not match bundled params.json. "
+                f"Missing={sorted(missing)[:10]}, "
+                f"unexpected={sorted(unexpected)[:10]}"
+            )
+    else:
+        with safe_open(
+            str(checkpoint_path),
+            framework="pt",
+            device="cpu",
+        ) as handle:
+            count = len(handle.keys())
     logger.info(
-        "Loading %d ZONOS2 tensors from %s as %s, then staging for %s with %s.",
+        "Loading %d ZONOS2%s tensors from %s as %s, then staging for %s "
+        "with %s.",
         count,
+        f" {quantization.upper()}" if quantization else "",
         checkpoint_path,
         torch_dtype,
         device,
         runtime_attention,
     )
-    use_dynamic_vram = should_use_dynamic_vram(model, device, torch_dtype)
-    source_dtype = inspect_checkpoint_dtype(checkpoint_path)
-    weight_device = torch.device("cpu") if device.type != "cpu" else device
-    load_native_weights(
-        model,
-        checkpoint_path,
-        weight_device,
-        source_dtype,
-        progress_callback=progress_callback,
+    runtime_model_bytes = (
+        estimate_checkpoint_storage_bytes(checkpoint_path)
+        if quantization is not None
+        else None
     )
+    use_dynamic_vram = should_use_dynamic_vram(
+        model,
+        device,
+        torch_dtype,
+        model_bytes=runtime_model_bytes,
+    )
+    source_dtype = (
+        torch.bfloat16
+        if quantization is not None
+        else inspect_checkpoint_dtype(checkpoint_path)
+    )
+    weight_device = torch.device("cpu") if device.type != "cpu" else device
+    if quantization == "fp8_e4m3":
+        load_quantized_weights(
+            model,
+            checkpoint_path,
+            weight_device,
+            progress_callback=progress_callback,
+        )
+    else:
+        load_native_weights(
+            model,
+            checkpoint_path,
+            weight_device,
+            source_dtype,
+            progress_callback=progress_callback,
+        )
     set_runtime_dtype(model, torch_dtype)
     if use_dynamic_vram:
         logger.info(
-            "ZONOS2 is using file-backed %s weights with on-demand %s "
-            "AIMDO residency.",
-            source_dtype,
+            "ZONOS2%s is using file-backed weights with on-demand %s AIMDO "
+            "residency.",
+            f" {quantization.upper()}" if quantization else "",
             torch_dtype,
         )
     elif dynamic_vram_active(device):
@@ -522,6 +753,8 @@ def load_zonos2_bundle(
         device,
         dynamic=use_dynamic_vram,
     )
+    if quantization is not None:
+        validate_quantized_runtime_model(model)
     if model_patcher is not None:
         patchers.append(model_patcher)
 
@@ -534,6 +767,8 @@ def load_zonos2_bundle(
         dtype_name=dtype_name,
         attention=runtime_attention,
         download_if_missing=bool(download_if_missing),
+        asset_repo_id=model_source.repo_id,
+        quantization=quantization,
         patchers=patchers,
     )
     try:

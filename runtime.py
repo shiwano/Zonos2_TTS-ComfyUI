@@ -26,7 +26,6 @@ from .native import (
 
 logger = logging.getLogger("Zonos2_TTS-ComfyUI")
 
-ASSET_REPO_ID = "drbaph/ZONOS2-BF16"
 DAC_SAMPLE_RATE = 44_100
 SPEAKER_SAMPLE_RATE = 24_000
 MAX_REFERENCE_SECONDS = 60.0
@@ -225,7 +224,7 @@ def ensure_codec(bundle: Zonos2Bundle) -> Zonos2DAC:
     if bundle.codec is not None:
         return bundle.codec
     local_dir = _require_or_download(
-        ASSET_REPO_ID,
+        bundle.asset_repo_id,
         model_dir() / "dac_44khz",
         bundle.download_if_missing,
         "dac_44khz",
@@ -248,7 +247,7 @@ def ensure_speaker_encoder(bundle: Zonos2Bundle) -> Zonos2SpeakerEncoder:
     if bundle.speaker_encoder is not None:
         return bundle.speaker_encoder
     local_dir = _require_or_download(
-        ASSET_REPO_ID,
+        bundle.asset_repo_id,
         model_dir() / "speaker_encoder",
         bundle.download_if_missing,
         "speaker_encoder",

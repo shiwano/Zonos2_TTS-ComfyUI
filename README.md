@@ -2,12 +2,13 @@
 
 ComfyUI custom nodes for [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2), with text-to-speech, audio-only voice cloning, SDPA and FlashAttention inference, native progress reporting, and ComfyUI/AIMDO memory management.
 
-[![Version](https://img.shields.io/badge/version-0.1.4-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.1.5-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
 [![Official Model](https://img.shields.io/badge/Hugging_Face-Zyphra%2FZONOS2-ffd21e)](https://huggingface.co/Zyphra/ZONOS2)
 [![Native BF16 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--BF16-ffd21e)](https://huggingface.co/drbaph/ZONOS2-BF16)
+[![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS-FP8)
 [![Model License](https://img.shields.io/badge/Model_License-Apache--2.0-green)](https://huggingface.co/Zyphra/ZONOS2)
 
 [简体中文](README_zh.md)
@@ -41,6 +42,7 @@ During inference we use nemo TN normalized UTF-8 bytes and an ECAPA-TDNN embeddi
 - Audio-only zero-shot voice cloning; no reference transcript is required.
 - All released ZONOS2 speaking-rate and quality-conditioning buckets.
 - `auto`, `bf16`, and `fp16` runtime dtypes.
+- Validated 9.78 GiB mixed FP8 checkpoint with FP8 E4M3 MoE expert gate/up weights and BF16-sensitive paths.
 - Automatic FlashAttention selection with PyTorch SDPA fallback.
 - Native ComfyUI progress bars and in-place CLI `tqdm` progress.
 - Real tensor registration with ComfyUI model management and AIMDO.
@@ -94,6 +96,7 @@ Models are managed under:
 ```text
 ComfyUI/models/zonos2/
 ├── zonos2-bf16.safetensors
+├── zonos2-fp8-mixed.safetensors
 ├── dac_44khz/
 │   ├── .gitattributes
 │   ├── config.json
@@ -111,15 +114,28 @@ ComfyUI/models/zonos2/
     └── tokenizer_ecapa_tdnn.py
 ```
 
-The preconfigured loader downloads all three assets from [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16):
+Two model presets are included:
 
-- `zonos2-bf16.safetensors` is downloaded when the preset is selected.
-- `dac_44khz/` is downloaded when the model bundle is first loaded.
-- `speaker_encoder/` is downloaded lazily when voice cloning is first used.
+- **ZONOS2 BF16** downloads `zonos2-bf16.safetensors` and missing shared assets from [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16).
+- **ZONOS2 FP8 Mixed** downloads `zonos2-fp8-mixed.safetensors` and missing shared assets from [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8).
 
-Enable `download_if_missing` to allow these downloads. Disable it for fully offline operation after placing every required asset in the paths above.
+Downloads are checked independently and reuse the same local folders across both presets:
 
-The custom node ships the official architecture configuration at `assets/params.json` and always validates the checkpoint names and shapes against it. Locally added `.safetensors` files also appear in the model dropdown.
+- The selected root checkpoint is downloaded whenever it is missing, even if `dac_44khz/` and `speaker_encoder/` already exist.
+- A complete local `dac_44khz/` folder is reused without downloading it again.
+- A complete local `speaker_encoder/` folder is reused without downloading it again.
+- The DAC is checked when the model bundle loads. The speaker encoder is checked lazily when voice cloning is first used.
+
+Enable `download_if_missing` to allow only the missing pieces to download. Disable it for fully offline operation after placing every required asset in the paths above.
+
+The custom node ships the official architecture configuration at `assets/params.json`. BF16 checkpoints are validated against the native architecture. Mixed FP8 checkpoints are validated against their format metadata, quantization policy, required ComfyUI quantization tensors, and runtime weight shapes before inference. Locally added `.safetensors` files also appear in the model dropdown.
+
+The mixed FP8 policy is deliberately conservative:
+
+- FP8 E4M3: MoE expert gate/up (`w13`) projections.
+- BF16: attention, dense FFN, expert-down (`w2`), LM head, routers, embeddings, norms, speaker projections, biases, and temperatures.
+
+This reduces the main checkpoint from about 14.28 GiB to 9.78 GiB while protecting the paths that failed under broader FP8 conversion. FP8 is primarily a memory-saving option and is not guaranteed to generate faster than BF16.
 
 Upload the complete `dac_44khz/` and `speaker_encoder/` directories to the model repository rather than reconstructing them from the abbreviated tree. At runtime, the DAC directly requires `config.json` and `model.safetensors`. The speaker encoder directly requires `config.json`, `model.safetensors`, `configuration_ecapa_tdnn.py`, and `modeling_ecapa_tdnn.py` because it is loaded through Transformers remote-code support. The preprocessor, feature-extractor, tokenizer, README, and Git metadata files are not directly used by this node's current inference path, but retaining the complete upstream folders preserves a valid, reusable Hugging Face package.
 
@@ -132,10 +148,10 @@ Upload the complete `dac_44khz/` and `speaker_encoder/` directories to the model
 
 | Input | Default | Options | Description |
 |---|---|---|---|
-| `model` | ZONOS2 BF16 preset | Presets and local safetensors | Loads from `ComfyUI/models/zonos2`. |
-| `dtype` | `auto` | `auto`, `bf16`, `fp16` | `auto` preserves the checkpoint dtype. Explicit values cast floating tensors while loading. |
+| `model` | ZONOS2 BF16 preset | BF16 preset, mixed FP8 preset, and local safetensors | Loads from `ComfyUI/models/zonos2`; each preset downloads from its listed Hugging Face repository. |
+| `dtype` | `auto` | `auto`, `bf16`, `fp16` | `auto` preserves standard checkpoint dtype and automatically uses BF16 compute for mixed FP8. Mixed FP8 accepts `auto` or `bf16`; `fp16` is rejected. |
 | `attention` | `auto` | `auto`, `SDPA`, `flash_attention` | `auto` uses FlashAttention when installed and compatible, otherwise SDPA. |
-| `download_if_missing` | `true` | boolean | Downloads missing checkpoint, DAC, and speaker encoder assets. |
+| `download_if_missing` | `true` | boolean | Independently downloads only the missing selected checkpoint, DAC, or speaker encoder assets. Existing shared folders are reused. |
 
 Changing the model, dtype, or attention backend intentionally hard-unloads the previous bundle before loading the replacement.
 
@@ -218,12 +234,14 @@ Transformers 4.x is not supported by this nodepack because common current ComfyU
 The ZONOS2 model, DAC decoder, and lazy speaker encoder are registered as real PyTorch modules with ComfyUI model management.
 
 - The BF16 main model is estimated at approximately 14.324 GiB. The loader adds a 3 GiB runtime reserve, producing an automatic AIMDO cutoff of approximately 17.324 GiB total VRAM.
+- The mixed FP8 main model is approximately 9.78 GiB. Its equivalent automatic AIMDO cutoff is approximately 12.78 GiB total VRAM.
+- With `dtype: auto`, mixed FP8 keeps FP8 expert storage and selects BF16 compute from checkpoint metadata. Native FP8 execution requires current ComfyUI/comfy-kitchen support and compatible hardware; unsupported hardware uses ComfyUI's compatible dequantized fallback and may be slower.
 - When AIMDO DynamicVRAM is enabled, GPUs below that cutoff, including typical 8 GiB, 12 GiB, and 16 GiB cards, use ComfyUI's real `CoreModelPatcher` and AIMDO VBAR path.
 - On that dynamic path, the main model keeps its large MoE expert weights file-backed and pages only the selected experts into VRAM on demand. VBAR allocations, page faults, residency, and eviction are real AIMDO operations rather than visualization emulation.
 - GPUs with enough total VRAM for the estimated model plus the 3 GiB reserve use the static GPU path. This avoids retained CPU model backing and gives the direct CUDA expert path.
 - The automatic choice uses the GPU's total VRAM capacity, not its currently free VRAM. A 24 GiB or 32 GiB GPU therefore selects the static path even when other loaded models are using part of its VRAM; ComfyUI may unload those models to make room.
 - Shared attention, routing, embedding, and output weights remain resident on the dynamic path to avoid per-token paging overhead.
-- Each expert's `w13` and `w2` projections share one pageable allocation, so only the routed expert needs to become resident and AIMDO performs one residency check per expert.
+- Each expert's FP8 `w13` and BF16 `w2` projections are independently AIMDO-pageable, so only projections belonging to routed experts need to become resident. They use separate VBAR allocations because their storage formats differ.
 - The smaller DAC and speaker encoder use ComfyUI's standard static patcher. Memory Visualization therefore shows them as orange static VRAM rows using their real loaded sizes.
 - Systems without AIMDO always use ComfyUI's standard static model patcher and load weights directly to the selected device, regardless of GPU capacity.
 - The main model's AIMDO bar reflects actual expert-page residency and updates as pages are faulted or evicted.
@@ -242,7 +260,11 @@ Without DynamicVRAM, measured BF16 CUDA allocation with the main model and DAC l
 
 **The model dropdown download fails or returns 404**
 
-Confirm [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) contains `zonos2-bf16.safetensors`, `dac_44khz/`, and `speaker_encoder/`. Partial uploads can fail until every required file is available.
+Confirm the selected repository contains its root checkpoint plus `dac_44khz/` and `speaker_encoder/`: [drbaph/ZONOS2-BF16](https://huggingface.co/drbaph/ZONOS2-BF16) for BF16 or [drbaph/ZONOS-FP8](https://huggingface.co/drbaph/ZONOS-FP8) for mixed FP8. Partial uploads can fail until the requested file is available. Existing complete local asset folders are not downloaded again.
+
+**FP8 reports an unsupported format or a 3D linear weight**
+
+Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.5 rejects the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
 
 **FlashAttention is unavailable**
 
@@ -315,4 +337,5 @@ If you find this model useful in an academic context, please cite:
 - [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2)
 - [Official Zyphra/ZONOS2 model release](https://huggingface.co/Zyphra/ZONOS2)
 - [Native BF16 ComfyUI model package](https://huggingface.co/drbaph/ZONOS2-BF16)
+- [Mixed FP8 ComfyUI model package](https://huggingface.co/drbaph/ZONOS-FP8)
 - [Descript DAC 44.1 kHz](https://huggingface.co/descript/dac_44khz)
