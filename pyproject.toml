@@ -1,17 +1,19 @@
 [project]
-name = "Zonos2_TTS-ComfyUI"
-description = "Native ComfyUI nodes for Zyphra ZONOS2 text-to-speech and voice cloning with AIMDO memory tracking"
+name = "zonos2-tts-comfyui-emotion"
+description = "Native ComfyUI nodes for Zyphra ZONOS2 text-to-speech and voice cloning with AIMDO memory tracking and emotion conditioning"
 version = "0.1.7"
 license = {file = "LICENSE"}
 dependencies = [
     "accelerate",
     "huggingface-hub",
+    "numpy",
     "safetensors",
     "tqdm",
 ]
 
 [project.urls]
-Repository = "https://github.com/Saganaki22/Zonos2_TTS-ComfyUI"
+Repository = "https://github.com/shiwano/Zonos2_TTS-ComfyUI"
+Upstream = "https://github.com/Saganaki22/Zonos2_TTS-ComfyUI"
 ZONOS2 = "https://github.com/Zyphra/ZONOS2"
 Model = "https://huggingface.co/drbaph/ZONOS2-BF16"
 FP8Model = "https://huggingface.co/drbaph/ZONOS2-FP8"

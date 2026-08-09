@@ -13,6 +13,7 @@
 # Lightweight dependencies handled by pyproject.toml and install.py:
 # accelerate
 # huggingface-hub
+# numpy
 # safetensors
 # tqdm
 #

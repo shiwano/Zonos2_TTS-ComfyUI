@@ -11,6 +11,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torchaudio
 
+from .emotion import emotion_hidden_delta
 from .loader import (
     Zonos2Bundle,
     add_bundle_module,
@@ -304,6 +305,10 @@ def generate_zonos2_audio(
     reference_audio: dict | None = None,
     clean_speaker_background: bool = False,
     accurate_mode: bool = True,
+    emotion_sliders: dict[str, float] | None = None,
+    emotion_valence: float = 0.0,
+    emotion_arousal: float = 0.0,
+    emotion_strength: float = 1.0,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict:
     if bundle.model is None:
@@ -328,6 +333,15 @@ def generate_zonos2_audio(
         clean_speaker_background=bool(clean_speaker_background),
         accurate_mode=bool(accurate_mode),
     )
+    emotion_delta = None
+    if speaker_embedding is not None:
+        emotion_delta = emotion_hidden_delta(
+            sliders=emotion_sliders,
+            valence=float(emotion_valence),
+            arousal=float(emotion_arousal),
+            strength=float(emotion_strength),
+        )
+
     delayed_codes, eos_frame = generate_audio_codes(
         bundle.model,
         prompt,
@@ -335,6 +349,7 @@ def generate_zonos2_audio(
         options=options,
         speaker_embedding=speaker_embedding,
         speaker_position=speaker_position,
+        emotion_delta=emotion_delta,
         progress_callback=progress_callback,
     )
     audio = codec.decode(

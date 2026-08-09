@@ -835,6 +835,7 @@ class Zonos2Model(nn.Module):
         attention_backend: str,
         speaker_embedding: torch.Tensor | None = None,
         speaker_position: int | None = None,
+        emotion_delta: torch.Tensor | None = None,
     ) -> torch.Tensor:
         x = self.multi_embedder(input_ids)
         if speaker_embedding is not None and speaker_position is not None:
@@ -842,6 +843,17 @@ class Zonos2Model(nn.Module):
                 projected = self._speaker_projection(
                     speaker_embedding.to(device=x.device)
                 )
+                if emotion_delta is not None:
+                    if emotion_delta.shape[-1] != projected.shape[-1]:
+                        raise ValueError(
+                            f"Emotion delta dim {emotion_delta.shape[-1]} does "
+                            "not match the projected speaker dim "
+                            f"{projected.shape[-1]}."
+                        )
+                    projected = projected + emotion_delta.to(
+                        device=projected.device,
+                        dtype=projected.dtype,
+                    )
                 x[:, speaker_position] = projected.to(dtype=x.dtype)
         x = F.rms_norm(
             x,
@@ -1513,6 +1525,7 @@ def generate_audio_codes(
     options: SamplingOptions,
     speaker_embedding: torch.Tensor | None = None,
     speaker_position: int | None = None,
+    emotion_delta: torch.Tensor | None = None,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> tuple[torch.Tensor, int | None]:
     device = torch.device(
@@ -1539,6 +1552,7 @@ def generate_audio_codes(
         attention_backend,
         speaker_embedding=speaker_embedding,
         speaker_position=speaker_position,
+        emotion_delta=emotion_delta,
     )
     generated: list[torch.Tensor] = []
     eos_frame: int | None = None

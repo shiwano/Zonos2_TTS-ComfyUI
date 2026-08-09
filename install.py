@@ -14,6 +14,7 @@ CRITICAL_IMPORTS = ["torch", "torchaudio", "transformers"]
 LIGHTWEIGHT_IMPORTS = {
     "accelerate": "accelerate",
     "huggingface_hub": "huggingface-hub",
+    "numpy": "numpy",
     "safetensors": "safetensors",
     "tqdm": "tqdm",
 }

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from .emotion import EMOTION_NONE, emotion_choices
 from .loader import (
     ATTENTION_OPTIONS,
     DTYPE_OPTIONS,
@@ -299,6 +300,54 @@ def _generation_controls() -> dict:
     }
 
 
+def _emotion_controls() -> dict:
+    return {
+        "emotion": (
+            emotion_choices(),
+            {
+                "default": EMOTION_NONE,
+                "tooltip": "Official ZONOS2 emotion direction added to the speaker vector after the model projects it. Speaker identity is preserved and only delivery shifts. Select none to leave conditioning untouched, which reproduces the output of a build without emotion support.",
+            },
+        ),
+        "emotion_strength": (
+            "FLOAT",
+            {
+                "default": 1.0,
+                "min": 0.0,
+                "max": 3.0,
+                "step": 0.05,
+                "tooltip": "Multiplier on top of the strengths ZONOS2 calibrated for each direction (3.0 for most, 4.0 for surprised), so 1.0 already gives the intended amount. Raise it for a stronger reading; large values distort the voice. 0 disables emotion.",
+            },
+        ),
+        "emotion_valence": (
+            "FLOAT",
+            {
+                "default": 0.0,
+                "min": -1.0,
+                "max": 1.0,
+                "step": 0.05,
+                "tooltip": "Continuous affect axis mixed in alongside the selected emotion. Negative is unpleasant, positive is pleasant, 0 leaves the axis unused.",
+            },
+        ),
+        "emotion_arousal": (
+            "FLOAT",
+            {
+                "default": 0.0,
+                "min": -1.0,
+                "max": 1.0,
+                "step": 0.05,
+                "tooltip": "Continuous affect axis mixed in alongside the selected emotion. Negative is calm, positive is excited, 0 leaves the axis unused.",
+            },
+        ),
+    }
+
+
+def _emotion_sliders(emotion: str) -> dict[str, float] | None:
+    if emotion == EMOTION_NONE:
+        return None
+    return {emotion: 1.0}
+
+
 def _sampling_options(
     max_new_tokens: int,
     temperature: float,
@@ -520,6 +569,7 @@ class Zonos2VoiceClone:
             ),
         }
         required.update(_generation_controls())
+        required.update(_emotion_controls())
         return {"required": required}
 
     RETURN_TYPES = ("AUDIO",)
@@ -556,6 +606,10 @@ class Zonos2VoiceClone:
         leading_silence: str,
         trailing_silence: str,
         seed: int,
+        emotion: str = EMOTION_NONE,
+        emotion_strength: float = 1.0,
+        emotion_valence: float = 0.0,
+        emotion_arousal: float = 0.0,
     ):
         options = _sampling_options(
             max_new_tokens,
@@ -584,6 +638,10 @@ class Zonos2VoiceClone:
             reference_audio=reference_audio,
             clean_speaker_background=bool(clean_speaker_background),
             accurate_mode=bool(accurate_mode),
+            emotion_sliders=_emotion_sliders(emotion),
+            emotion_valence=float(emotion_valence),
+            emotion_arousal=float(emotion_arousal),
+            emotion_strength=float(emotion_strength),
             progress_callback=_progress_callback(options.max_new_tokens),
         )
         return (audio,)
