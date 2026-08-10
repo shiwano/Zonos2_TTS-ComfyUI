@@ -6,7 +6,7 @@
   "nodes": [
     {
       "id": 2,
-      "type": "Zonos2VoiceGeneration",
+      "type": "Zonos2EmotionVoiceGeneration",
       "pos": [
         581.4602008702432,
         35.612868817308765
@@ -35,10 +35,10 @@
         }
       ],
       "properties": {
-        "cnr_id": "Zonos2_TTS-ComfyUI",
-        "ver": "0.1.0",
-        "Node name for S&R": "Zonos2VoiceGeneration",
-        "aux_id": "Saganaki22/Zonos2_TTS-ComfyUI",
+        "cnr_id": "zonos2-tts-comfyui-emotion",
+        "ver": "0.2.0",
+        "Node name for S&R": "Zonos2EmotionVoiceGeneration",
+        "aux_id": "shiwano/zonos2-tts-comfyui-emotion",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "7.8",
@@ -105,7 +105,7 @@
     },
     {
       "id": 5,
-      "type": "Zonos2VoiceClone",
+      "type": "Zonos2EmotionVoiceClone",
       "pos": [
         576.4814589874567,
         802.2620234465568
@@ -139,10 +139,10 @@
         }
       ],
       "properties": {
-        "cnr_id": "Zonos2_TTS-ComfyUI",
-        "ver": "0.1.0",
-        "Node name for S&R": "Zonos2VoiceClone",
-        "aux_id": "Saganaki22/Zonos2_TTS-ComfyUI",
+        "cnr_id": "zonos2-tts-comfyui-emotion",
+        "ver": "0.2.0",
+        "Node name for S&R": "Zonos2EmotionVoiceClone",
+        "aux_id": "shiwano/zonos2-tts-comfyui-emotion",
         "ue_properties": {
           "widget_ue_connectable": {},
           "version": "7.8",
@@ -174,7 +174,7 @@
     },
     {
       "id": 8,
-      "type": "Zonos2ModelLoader",
+      "type": "Zonos2EmotionModelLoader",
       "pos": [
         128.66220797910125,
         22.61947258086233
@@ -202,9 +202,9 @@
           "widget_ue_connectable": {},
           "input_ue_unconnectable": {}
         },
-        "cnr_id": "Zonos2_TTS-ComfyUI",
-        "ver": "38d7d662b0c8ab568e39302fcf932e0c309fe81b",
-        "Node name for S&R": "Zonos2ModelLoader"
+        "cnr_id": "zonos2-tts-comfyui-emotion",
+        "ver": "0.2.0",
+        "Node name for S&R": "Zonos2EmotionModelLoader"
       },
       "widgets_values": [
         "ZONOS2 FP8 Mixed - drbaph/ZONOS2-FP8",

@@ -14,15 +14,14 @@ import torch.nn.functional as F
 from safetensors import safe_open
 
 try:
-    from comfy.ops import (
-        cast_bias_weight,
-        uncast_bias_weight,
-    )
+    from comfy.ops import cast_bias_weight, uncast_bias_weight
 except ImportError:
     def cast_bias_weight(module, input=None, **kwargs):
+        del input, kwargs
         return module.weight, module.bias, (None, None, None)
 
     def uncast_bias_weight(module, weight, bias, offload_stream):
+        del module, weight, bias, offload_stream
         return None
 
 
@@ -49,7 +48,7 @@ try:
 except ImportError:
     tqdm = None
 
-logger = logging.getLogger("Zonos2_TTS-ComfyUI")
+logger = logging.getLogger("zonos2-tts-comfyui-emotion")
 
 PAD_ID = 0
 UNK_ID = 1

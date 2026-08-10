@@ -6,11 +6,9 @@ from pathlib import Path
 import pytest
 import torch
 import torch.nn as nn
-
 from zonos2_tts_comfyui_test import loader, nodes
 from zonos2_tts_comfyui_test.native import Zonos2Model, read_config
 from zonos2_tts_comfyui_test.runtime import Zonos2SpeakerEncoder
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -73,7 +71,7 @@ def test_resume_registers_with_comfy_memory_manager(monkeypatch):
 
     monkeypatch.setattr(loader, "_register_with_comfy", calls.append)
 
-    loader.resume_runtime_module(patcher, torch.device("cuda"))
+    loader.resume_runtime_module(patcher)
 
     assert calls == [patcher]
 
@@ -176,11 +174,11 @@ def test_high_vram_uses_static_model_path(monkeypatch):
     config = read_config(ROOT / "assets" / "params.json")
     model = Zonos2Model(config)
 
-    monkeypatch.setattr(loader, "dynamic_vram_active", lambda device: True)
+    monkeypatch.setattr(loader, "dynamic_vram_active", lambda *_: True)
     monkeypatch.setattr(
         torch.cuda,
         "get_device_properties",
-        lambda device: type("Props", (), {"total_memory": 32 * 1024**3})(),
+        lambda *_: type("Props", (), {"total_memory": 32 * 1024**3})(),
     )
 
     assert not loader.should_use_dynamic_vram(
@@ -194,11 +192,11 @@ def test_low_vram_keeps_dynamic_model_path(monkeypatch):
     config = read_config(ROOT / "assets" / "params.json")
     model = Zonos2Model(config)
 
-    monkeypatch.setattr(loader, "dynamic_vram_active", lambda device: True)
+    monkeypatch.setattr(loader, "dynamic_vram_active", lambda *_: True)
     monkeypatch.setattr(
         torch.cuda,
         "get_device_properties",
-        lambda device: type("Props", (), {"total_memory": 16 * 1024**3})(),
+        lambda *_: type("Props", (), {"total_memory": 16 * 1024**3})(),
     )
 
     assert loader.should_use_dynamic_vram(

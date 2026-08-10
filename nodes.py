@@ -3,19 +3,11 @@
 from __future__ import annotations
 
 from .emotion import EMOTION_NONE, emotion_choices
-from .loader import (
-    ATTENTION_OPTIONS,
-    DTYPE_OPTIONS,
-    get_model_choices,
-    load_zonos2_bundle,
-)
+from .loader import (ATTENTION_OPTIONS, DTYPE_OPTIONS, get_model_choices,
+                     load_zonos2_bundle)
 from .native import SamplingOptions
-from .runtime import (
-    MAX_REFERENCE_SECONDS,
-    RECOMMENDED_REFERENCE_MAX_SECONDS,
-    RECOMMENDED_REFERENCE_MIN_SECONDS,
-    generate_zonos2_audio,
-)
+from .runtime import (MAX_REFERENCE_SECONDS, RECOMMENDED_REFERENCE_MAX_SECONDS,
+                      RECOMMENDED_REFERENCE_MIN_SECONDS, generate_zonos2_audio)
 
 try:
     from comfy.utils import ProgressBar
@@ -440,7 +432,7 @@ class Zonos2ModelLoader:
         "Loaded ZONOS2 model bundle containing the native language model and DAC decoder, managed by ComfyUI/AIMDO.",
     )
     FUNCTION = "load_model"
-    CATEGORY = "ZONOS2 TTS"
+    CATEGORY = "ZONOS2 TTS (Emotion)"
     DESCRIPTION = (
         "Load native ZONOS2 weights with ComfyUI/AIMDO memory tracking."
     )
@@ -484,7 +476,7 @@ class Zonos2VoiceGeneration:
         "Generated mono speech as native ComfyUI AUDIO at 44.1 kHz.",
     )
     FUNCTION = "generate"
-    CATEGORY = "ZONOS2 TTS"
+    CATEGORY = "ZONOS2 TTS (Emotion)"
     DESCRIPTION = "Generate speech with ZONOS2."
 
     def generate(
@@ -588,7 +580,7 @@ class Zonos2VoiceClone:
         "Voice-cloned mono speech as native ComfyUI AUDIO at 44.1 kHz.",
     )
     FUNCTION = "clone"
-    CATEGORY = "ZONOS2 TTS"
+    CATEGORY = "ZONOS2 TTS (Emotion)"
     DESCRIPTION = (
         "Clone a voice from a native ComfyUI AUDIO input without reference text."
     )
@@ -660,13 +652,13 @@ class Zonos2VoiceClone:
 
 
 NODE_CLASS_MAPPINGS = {
-    "Zonos2ModelLoader": Zonos2ModelLoader,
-    "Zonos2VoiceGeneration": Zonos2VoiceGeneration,
-    "Zonos2VoiceClone": Zonos2VoiceClone,
+    "Zonos2EmotionModelLoader": Zonos2ModelLoader,
+    "Zonos2EmotionVoiceGeneration": Zonos2VoiceGeneration,
+    "Zonos2EmotionVoiceClone": Zonos2VoiceClone,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "Zonos2ModelLoader": "ZONOS2 Model Loader",
-    "Zonos2VoiceGeneration": "ZONOS2 Voice Generation",
-    "Zonos2VoiceClone": "ZONOS2 Voice Clone",
+    "Zonos2EmotionModelLoader": "ZONOS2 Model Loader (Emotion)",
+    "Zonos2EmotionVoiceGeneration": "ZONOS2 Voice Generation (Emotion)",
+    "Zonos2EmotionVoiceClone": "ZONOS2 Voice Clone (Emotion)",
 }

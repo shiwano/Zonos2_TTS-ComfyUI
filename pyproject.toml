@@ -1,31 +1,18 @@
 [project]
 name = "zonos2-tts-comfyui-emotion"
 description = "Native ComfyUI nodes for Zyphra ZONOS2 text-to-speech and voice cloning with AIMDO memory tracking and emotion conditioning"
-version = "0.1.7"
-license = {file = "LICENSE"}
-dependencies = [
-    "accelerate",
-    "huggingface-hub",
-    "numpy",
-    "safetensors",
-    "tqdm",
-]
+version = "0.2.0"
+license = { file = "LICENSE" }
+dependencies = ["accelerate", "huggingface-hub", "numpy", "safetensors", "tqdm"]
 
 [project.urls]
-Repository = "https://github.com/shiwano/Zonos2_TTS-ComfyUI"
+Repository = "https://github.com/shiwano/zonos2-tts-comfyui-emotion"
 Upstream = "https://github.com/Saganaki22/Zonos2_TTS-ComfyUI"
 ZONOS2 = "https://github.com/Zyphra/ZONOS2"
 Model = "https://huggingface.co/drbaph/ZONOS2-BF16"
 FP8Model = "https://huggingface.co/drbaph/ZONOS2-FP8"
 
 [tool.comfy]
-PublisherId = "saganaki22"
-DisplayName = "ZONOS2 TTS"
-Icon = "https://avatars.githubusercontent.com/u/84208527"
-PreInstall = "install.py"
-
-[tool.zonos2-tts]
-model-folder = "ComfyUI/models/zonos2"
-model-vram = "about 15.5 GB for BF16 or 10.7 GB for mixed FP8, plus KV cache and DAC"
-transformers = ">=5.0.0,<=5.12.0"
-recommended-transformers = "5.3.0"
+PublisherId = "shiwano"
+DisplayName = "ZONOS2 TTS (Emotion)"
+Icon = "https://avatars.githubusercontent.com/u/1025342"

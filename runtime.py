@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable
 
 import torch
 import torch.nn as nn
@@ -12,20 +12,12 @@ import torch.nn.functional as F
 import torchaudio
 
 from .emotion import emotion_hidden_delta
-from .loader import (
-    Zonos2Bundle,
-    add_bundle_module,
-    model_dir,
-    resume_bundle_to_device,
-)
-from .native import (
-    SamplingOptions,
-    build_prompt,
-    generate_audio_codes,
-    shear_up,
-)
+from .loader import (Zonos2Bundle, add_bundle_module, model_dir,
+                     resume_bundle_to_device)
+from .native import (SamplingOptions, build_prompt, generate_audio_codes,
+                     shear_up)
 
-logger = logging.getLogger("Zonos2_TTS-ComfyUI")
+logger = logging.getLogger("zonos2-tts-comfyui-emotion")
 
 DAC_SAMPLE_RATE = 44_100
 SPEAKER_SAMPLE_RATE = 24_000
@@ -275,7 +267,7 @@ def ensure_speaker_encoder(bundle: Zonos2Bundle) -> Zonos2SpeakerEncoder:
 
 def extract_speaker_embedding(
     bundle: Zonos2Bundle,
-    reference_audio: dict,
+    reference_audio: Any,
 ) -> torch.Tensor:
     if not isinstance(reference_audio, dict):
         raise TypeError("reference_audio must be a native ComfyUI AUDIO value.")

@@ -2,7 +2,6 @@ import importlib.util
 import sys
 from pathlib import Path
 
-
 PACKAGE_NAME = "zonos2_tts_comfyui_test"
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -12,6 +11,7 @@ if PACKAGE_NAME not in sys.modules:
         ROOT / "__init__.py",
         submodule_search_locations=[str(ROOT)],
     )
+    assert spec is not None and spec.loader is not None
     package = importlib.util.module_from_spec(spec)
     sys.modules[PACKAGE_NAME] = package
     spec.loader.exec_module(package)

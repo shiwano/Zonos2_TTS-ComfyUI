@@ -4,27 +4,17 @@ from types import SimpleNamespace
 
 import pytest
 import torch
-
 import zonos2_tts_comfyui_test.runtime as runtime_module
-from zonos2_tts_comfyui_test.emotion import (
-    EMOTION_NONE,
-    EmotionCalibration,
-    EmotionDirections,
-    emotion_choices,
-    emotion_hidden_delta,
-    load_calibration,
-    load_directions,
-)
-from zonos2_tts_comfyui_test.native import (
-    SamplingOptions,
-    Zonos2Model,
-    _apply_emotion_cfg,
-    generate_audio_codes,
-    read_config,
-)
+from zonos2_tts_comfyui_test.emotion import (EMOTION_NONE, EmotionCalibration,
+                                             EmotionDirections,
+                                             emotion_choices,
+                                             emotion_hidden_delta,
+                                             load_calibration, load_directions)
+from zonos2_tts_comfyui_test.native import (SamplingOptions, Zonos2Model,
+                                            _apply_emotion_cfg,
+                                            generate_audio_codes, read_config)
 from zonos2_tts_comfyui_test.nodes import Zonos2VoiceClone
 from zonos2_tts_comfyui_test.runtime import generate_zonos2_audio
-
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -158,6 +148,14 @@ def test_uncalibrated_directions_use_the_raw_weights():
     assert torch.allclose(delta, 2.0 * torch.ones(4))
 
 
+def _capture(sink):
+    def hook(module, inputs, output):
+        del module, inputs
+        sink.append(output)
+
+    return hook
+
+
 def test_model_adds_the_delta_after_the_speaker_projection():
     model = _small_model()
     speaker = torch.randn(1, model.config.speaker_embedding_dim)
@@ -172,7 +170,7 @@ def test_model_adds_the_delta_after_the_speaker_projection():
     def run(emotion_delta):
         embedded = []
         handle = model.multi_embedder.register_forward_hook(
-            lambda module, inputs, output: embedded.append(output)
+            _capture(embedded)
         )
         try:
             model(
@@ -230,31 +228,43 @@ def _codes_with_cfg(model, scale, delta):
 
 def test_guidance_runs_an_unguided_twin_in_the_same_batch():
     model = _small_model()
-    widths = []
-    handle = model.multi_embedder.register_forward_hook(
-        lambda module, inputs, output: widths.append(output.shape[0])
-    )
+    embedded = []
+    handle = model.multi_embedder.register_forward_hook(_capture(embedded))
     try:
         _codes_with_cfg(model, 1.5, torch.randn(model.config.dim))
     finally:
         handle.remove()
 
-    assert widths and set(widths) == {2}
+    assert embedded and {item.shape[0] for item in embedded} == {2}
+
+
+def test_guidance_leaves_the_twin_row_unconditioned():
+    model = _small_model()
+    delta = torch.randn(model.config.dim)
+    embedded = []
+    handle = model.multi_embedder.register_forward_hook(_capture(embedded))
+    try:
+        _codes_with_cfg(model, 1.5, delta)
+    finally:
+        handle.remove()
+
+    prefill = embedded[0]
+
+    assert prefill.shape[0] == 2
+    assert torch.allclose(prefill[0, 0] - prefill[1, 0], delta)
 
 
 @pytest.mark.parametrize("scale", [1.0, 1.5])
 def test_guidance_leaves_the_batch_alone_without_a_delta(scale):
     model = _small_model()
-    widths = []
-    handle = model.multi_embedder.register_forward_hook(
-        lambda module, inputs, output: widths.append(output.shape[0])
-    )
+    embedded = []
+    handle = model.multi_embedder.register_forward_hook(_capture(embedded))
     try:
         _codes_with_cfg(model, scale, None)
     finally:
         handle.remove()
 
-    assert widths and set(widths) == {1}
+    assert embedded and {item.shape[0] for item in embedded} == {1}
 
 
 def test_cfg_combination_follows_the_upstream_formula():
@@ -281,22 +291,27 @@ def test_clone_exposes_guidance_as_opt_in():
 def _generate_with_emotion(monkeypatch, reference_audio, **emotion):
     captured = {}
 
+    def fake_build_prompt(*args, **kwargs):
+        del args, kwargs
+        return torch.zeros(1, 1, 9), 0
+
     def fake_generate_audio_codes(model, prompt, **kwargs):
+        del model, prompt
         captured.update(kwargs)
         return torch.zeros(1, 1, 9), None
 
-    monkeypatch.setattr(runtime_module, "ensure_codec", lambda bundle: codec)
-    monkeypatch.setattr(runtime_module, "ensure_speaker_encoder", lambda bundle: None)
-    monkeypatch.setattr(runtime_module, "resume_bundle_to_device", lambda bundle: None)
+    monkeypatch.setattr(runtime_module, "ensure_codec", lambda *_: codec)
+    monkeypatch.setattr(runtime_module, "ensure_speaker_encoder", lambda *_: None)
+    monkeypatch.setattr(runtime_module, "resume_bundle_to_device", lambda *_: None)
     monkeypatch.setattr(
         runtime_module,
         "extract_speaker_embedding",
-        lambda bundle, audio: torch.zeros(1, 8),
+        lambda *_: torch.zeros(1, 8),
     )
     monkeypatch.setattr(
         runtime_module,
         "build_prompt",
-        lambda config, **kwargs: (torch.zeros(1, 1, 9), 0),
+        fake_build_prompt,
     )
     monkeypatch.setattr(
         runtime_module,
@@ -308,6 +323,7 @@ def _generate_with_emotion(monkeypatch, reference_audio, **emotion):
         sample_rate = 44_100
 
         def decode(self, codes, pad_id, eos_frame):
+            del codes, pad_id, eos_frame
             return torch.zeros(1, 16)
 
     codec = Codec()

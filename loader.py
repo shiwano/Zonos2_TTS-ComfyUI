@@ -12,19 +12,12 @@ from typing import Any, Callable
 import torch
 from safetensors import safe_open
 
-from .native import (
-    Zonos2Config,
-    Zonos2Model,
-    build_native_model,
-    load_native_weights,
-    load_quantized_weights,
-    read_config,
-    set_runtime_dtype,
-    validate_quantized_runtime_model,
-    validate_checkpoint_layout,
-)
+from .native import (Zonos2Config, Zonos2Model, build_native_model,
+                     load_native_weights, load_quantized_weights, read_config,
+                     set_runtime_dtype, validate_checkpoint_layout,
+                     validate_quantized_runtime_model)
 
-logger = logging.getLogger("Zonos2_TTS-ComfyUI")
+logger = logging.getLogger("zonos2-tts-comfyui-emotion")
 
 MODEL_FOLDER_NAME = "zonos2"
 BF16_REPO_ID = "drbaph/ZONOS2-BF16"
@@ -558,13 +551,13 @@ def register_runtime_module(
     return patcher
 
 
-def resume_runtime_module(patcher: Any, device: torch.device) -> None:
+def resume_runtime_module(patcher: Any) -> None:
     if patcher is None:
         return
     _register_with_comfy(patcher)
 
 
-def unload_runtime_module(patcher: Any, hard: bool = True) -> None:
+def unload_runtime_module(patcher: Any) -> None:
     if patcher is None:
         return
     _unregister_from_comfy(patcher)
@@ -606,7 +599,7 @@ def unload_zonos2_bundle(
         return
     logger.info("Unloading ZONOS2 bundle (%s).", reason)
     for patcher in list(bundle.patchers):
-        unload_runtime_module(patcher, hard=hard)
+        unload_runtime_module(patcher)
     bundle.patchers.clear()
 
     modules = [

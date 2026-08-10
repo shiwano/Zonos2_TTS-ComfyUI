@@ -2,15 +2,15 @@ import importlib.util
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location("zonos2_install_test", ROOT / "install.py")
+assert SPEC is not None and SPEC.loader is not None
 INSTALL = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(INSTALL)
 
 
 def test_install_command_uses_uv_for_active_python(monkeypatch):
-    monkeypatch.setattr(INSTALL.shutil, "which", lambda name: "C:/tools/uv.exe")
+    monkeypatch.setattr(INSTALL.shutil, "which", lambda *_: "C:/tools/uv.exe")
 
     command = INSTALL._install_command(["tqdm"])
 
@@ -25,7 +25,7 @@ def test_install_command_uses_uv_for_active_python(monkeypatch):
 
 
 def test_install_command_falls_back_to_pip(monkeypatch):
-    monkeypatch.setattr(INSTALL.shutil, "which", lambda name: None)
+    monkeypatch.setattr(INSTALL.shutil, "which", lambda *_: None)
 
     command = INSTALL._install_command(["tqdm"])
 

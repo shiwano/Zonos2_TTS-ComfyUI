@@ -15,7 +15,7 @@ from typing import Mapping
 import numpy as np
 import torch
 
-logger = logging.getLogger("Zonos2_TTS-ComfyUI")
+logger = logging.getLogger("zonos2-tts-comfyui-emotion")
 
 DIRECTIONS_DIR = Path(__file__).resolve().parent / "emotion_directions"
 MANIFEST_NAME = "manifest.json"

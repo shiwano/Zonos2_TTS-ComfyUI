@@ -1,4 +1,4 @@
-"""Dependency check/install helper for Zonos2_TTS-ComfyUI."""
+"""Dependency check/install helper for zonos2-tts-comfyui-emotion."""
 
 from __future__ import annotations
 
@@ -85,7 +85,7 @@ def main() -> int:
         if importlib.util.find_spec(module) is None
     ]
     if not missing:
-        print("Zonos2_TTS-ComfyUI dependencies are already present.")
+        print("zonos2-tts-comfyui-emotion dependencies are already present.")
         return 0
 
     print("Installing missing lightweight dependencies:", ", ".join(missing))

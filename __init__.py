@@ -5,18 +5,18 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-__version__ = "0.1.7"
+__version__ = "0.2.0"
 __citation__ = """@misc{zyphra2025zonos,
   title     = {Zonos V2 Technical Report},
   author    = {Gabriel Clark, Sofian Mejjoute, Mohamed Osman, George Close, Beren Millidge},
   year      = {2026},
 }"""
 
-logger = logging.getLogger("Zonos2_TTS-ComfyUI")
+logger = logging.getLogger("zonos2-tts-comfyui-emotion")
 logger.propagate = False
 if not logger.handlers:
     _handler = logging.StreamHandler()
-    _handler.setFormatter(logging.Formatter("[Zonos2_TTS-ComfyUI] %(message)s"))
+    _handler.setFormatter(logging.Formatter("[zonos2-tts-comfyui-emotion] %(message)s"))
     logger.addHandler(_handler)
 logger.setLevel(logging.INFO)
 

@@ -1,8 +1,8 @@
-# ZONOS2 TTS ComfyUI
+# ZONOS2 TTS ComfyUI (Emotion)
 
-ComfyUI custom nodes for [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2), with text-to-speech, audio-only voice cloning, SDPA and FlashAttention inference, native progress reporting, and ComfyUI/AIMDO memory management.
+ComfyUI custom nodes for [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2), with text-to-speech, audio-only voice cloning, emotion conditioning, SDPA and FlashAttention inference, native progress reporting, and ComfyUI/AIMDO memory management.
 
-[![Version](https://img.shields.io/badge/version-0.1.7-blue)](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
+[![Version](https://img.shields.io/badge/version-0.2.0-blue)](https://github.com/shiwano/zonos2-tts-comfyui-emotion)
 [![ComfyUI](https://img.shields.io/badge/ComfyUI-Custom_Node-2d7dd2)](https://github.com/comfyanonymous/ComfyUI)
 [![Upstream](https://img.shields.io/badge/Upstream-Zyphra%2FZONOS2-111111)](https://github.com/Zyphra/ZONOS2)
 [![Zyphra Blog](https://img.shields.io/badge/Zyphra-ZONOS2_Blog-7c3aed)](https://www.zyphra.com/our-work/zonos2)
@@ -11,9 +11,14 @@ ComfyUI custom nodes for [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2), with
 [![Mixed FP8 Model](https://img.shields.io/badge/Hugging_Face-drbaph%2FZONOS2--FP8-ffd21e)](https://huggingface.co/drbaph/ZONOS2-FP8)
 [![Model License](https://img.shields.io/badge/Model_License-Apache--2.0-green)](https://huggingface.co/Zyphra/ZONOS2)
 
-[简体中文](README_zh.md)
+## Differences from upstream
 
-<img width="1444" height="1203" alt="Screenshot 2026-06-12 214924" src="https://github.com/user-attachments/assets/a776ed13-a106-476f-b5fa-e55402365bb8" />
+- **Emotion conditioning on the Voice Clone node** — `emotion`, `emotion_strength`, `emotion_valence`, `emotion_arousal`.
+- **Emotion classifier-free guidance** — `emotion_cfg_scale`.
+- **Renamed nodes** — `Zonos2Emotion*` keys and an `(Emotion)` suffix on display names and the category. Workflows saved against upstream node names must be rebuilt.
+- **`numpy` added** to the dependencies.
+
+## About ZONOS2
 
 ZONOS2 is our latest text-to-speech model trained on more than 6 million hours of varied multilingual speech, delivering expressiveness and quality on par with—or even surpassing—top TTS providers at low latency with MoE. ZONOS2 excels at high-fidelity and naturalistic voice cloning.
 
@@ -21,15 +26,14 @@ During inference we use nemo TN normalized UTF-8 bytes and an ECAPA-TDNN embeddi
 
 <img width="1600" height="833" alt="zonos2" src="https://github.com/user-attachments/assets/a63c9327-51c7-446c-a99b-ca0fbe5da93a" />
 
-
 ![ZONOS2 inference overview](https://huggingface.co/Zyphra/ZONOS2/resolve/main/assets/zonos2_arlooop_animated.gif)
 
 **Language Support**
 
-| Tier | Languages |
-| --- | --- |
-| Tier 1 | English, Mandarin Chinese, Japanese |
-| Tier 2 | Korean, Russian, Italian, Portuguese, French, Spanish, Vietnamese, German, Hebrew, Dutch |
+| Tier   | Languages                                                                                                                                                                                      |
+| ------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tier 1 | English, Mandarin Chinese, Japanese                                                                                                                                                            |
+| Tier 2 | Korean, Russian, Italian, Portuguese, French, Spanish, Vietnamese, German, Hebrew, Dutch                                                                                                       |
 | Tier 3 | Swedish, Hindi, Tamil, Telugu, Thai, Norwegian, Bengali, Tagalog, Arabic, Danish, Indonesian, Polish, Ukrainian, Romanian, Finnish, Hungarian, Lithuanian, Estonian, Slovak, Croatian, Latvian |
 
 > [!WARNING]
@@ -53,13 +57,13 @@ During inference we use nemo TN normalized UTF-8 bytes and an ECAPA-TDNN embeddi
 
 ### ComfyUI Manager
 
-Once listed in ComfyUI Manager, search for **ZONOS2 TTS** and install it normally.
+Search ComfyUI Manager for **ZONOS2 TTS (Emotion)** (registry id `zonos2-tts-comfyui-emotion`) and install it normally.
 
-To install it immediately through Manager:
+To install it through Manager without the registry listing:
 
 1. Open **Manager**.
 2. Choose **Install via Git URL**.
-3. Enter `https://github.com/Saganaki22/Zonos2_TTS-ComfyUI`.
+3. Enter `https://github.com/shiwano/zonos2-tts-comfyui-emotion`.
 4. Restart ComfyUI.
 
 ### Manual installation
@@ -67,21 +71,21 @@ To install it immediately through Manager:
 From the `ComfyUI/custom_nodes` directory:
 
 ```powershell
-git clone https://github.com/Saganaki22/Zonos2_TTS-ComfyUI.git
-..\venv\Scripts\python.exe Zonos2_TTS-ComfyUI\install.py
+git clone https://github.com/shiwano/zonos2-tts-comfyui-emotion.git
+..\venv\Scripts\python.exe zonos2-tts-comfyui-emotion\install.py
 ```
 
 Linux portable or venv installations can run:
 
 ```bash
-git clone https://github.com/Saganaki22/Zonos2_TTS-ComfyUI.git
-../venv/bin/python Zonos2_TTS-ComfyUI/install.py
+git clone https://github.com/shiwano/zonos2-tts-comfyui-emotion.git
+../venv/bin/python zonos2-tts-comfyui-emotion/install.py
 ```
 
 For a uv-managed ComfyUI environment:
 
 ```bash
-uv run python Zonos2_TTS-ComfyUI/install.py
+uv run python zonos2-tts-comfyui-emotion/install.py
 ```
 
 When uv is available, `install.py` automatically runs `uv pip install --python <active ComfyUI Python>`. Otherwise, it falls back to `python -m pip`. Restart ComfyUI after installing or updating. The helper installs only missing lightweight dependencies and does not replace ComfyUI's `torch`, `torchaudio`, or `transformers`.
@@ -144,72 +148,72 @@ Upload the complete `dac_44khz/` and `speaker_encoder/` directories to the model
 <details>
 <summary><strong>Nodes and settings</strong></summary>
 
-### ZONOS2 Model Loader
+### ZONOS2 Model Loader (Emotion)
 
-| Input | Default | Options | Description |
-|---|---|---|---|
-| `model` | ZONOS2 BF16 preset | BF16 preset, mixed FP8 preset, and local safetensors | Loads from `ComfyUI/models/zonos2`; each preset downloads from its listed Hugging Face repository. |
-| `dtype` | `auto` | `auto`, `bf16`, `fp16` | `auto` preserves standard checkpoint dtype and automatically uses BF16 compute for mixed FP8. Mixed FP8 accepts `auto` or `bf16`; `fp16` is rejected. |
-| `attention` | `auto` | `auto`, `SDPA`, `flash_attention` | `auto` uses FlashAttention when installed and compatible, otherwise SDPA. |
-| `download_if_missing` | `true` | boolean | Independently downloads only the missing selected checkpoint, DAC, or speaker encoder assets. Existing shared folders are reused. |
+| Input                 | Default            | Options                                              | Description                                                                                                                                           |
+| --------------------- | ------------------ | ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `model`               | ZONOS2 BF16 preset | BF16 preset, mixed FP8 preset, and local safetensors | Loads from `ComfyUI/models/zonos2`; each preset downloads from its listed Hugging Face repository.                                                    |
+| `dtype`               | `auto`             | `auto`, `bf16`, `fp16`                               | `auto` preserves standard checkpoint dtype and automatically uses BF16 compute for mixed FP8. Mixed FP8 accepts `auto` or `bf16`; `fp16` is rejected. |
+| `attention`           | `auto`             | `auto`, `SDPA`, `flash_attention`                    | `auto` uses FlashAttention when installed and compatible, otherwise SDPA.                                                                             |
+| `download_if_missing` | `true`             | boolean                                              | Independently downloads only the missing selected checkpoint, DAC, or speaker encoder assets. Existing shared folders are reused.                     |
 
 Changing the model, dtype, or attention backend intentionally hard-unloads the previous bundle before loading the replacement.
 
-### ZONOS2 Voice Generation
+### ZONOS2 Voice Generation (Emotion)
 
 Accepts `zonos2_model` and UTF-8 text, then returns mono ComfyUI `AUDIO` at 44.1 kHz.
 
-### ZONOS2 Voice Clone
+### ZONOS2 Voice Clone (Emotion)
 
 Accepts `zonos2_model`, UTF-8 text, and a required native ComfyUI `reference_audio` noodle. ZONOS2 extracts its official 2048-dimensional ECAPA-TDNN speaker embedding directly from the audio; reference text is not required. The model conditions on this fixed speaker embedding rather than the reference waveform or transcript, so voice identity can transfer more reliably than accent, cadence, emotion, and other utterance-level prosody.
 
-| Clone setting | Default | Description |
-|---|---:|---|
-| `reference_audio` | required | Use 5–30 seconds of clear, single-speaker speech that demonstrates the desired accent. The node accepts at most 60 seconds and clips longer input with a CLI warning. |
-| `clean_speaker_background` | `false` | Matches the upstream default. Enable only for genuinely clean studio-like speech; leave disabled for ordinary recordings or audible room tone, noise, reverb, or ambience. |
-| `accurate_mode` | `true` | Requests stricter adherence to the speaker embedding. It may improve identity similarity, but it is not a dedicated accent or prosody control. Disable for looser, potentially more expressive conditioning. |
+| Clone setting              |  Default | Description                                                                                                                                                                                                  |
+| -------------------------- | -------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `reference_audio`          | required | Use 5–30 seconds of clear, single-speaker speech that demonstrates the desired accent. The node accepts at most 60 seconds and clips longer input with a CLI warning.                                        |
+| `clean_speaker_background` |  `false` | Matches the upstream default. Enable only for genuinely clean studio-like speech; leave disabled for ordinary recordings or audible room tone, noise, reverb, or ambience.                                   |
+| `accurate_mode`            |   `true` | Requests stricter adherence to the speaker embedding. It may improve identity similarity, but it is not a dedicated accent or prosody control. Disable for looser, potentially more expressive conditioning. |
 
 ### Emotion control
 
 Voice Clone applies ZONOS2's official emotion directions, shipped in `emotion_directions/`, to the speaker vector after the model projects it into hidden space. Voice Generation does not expose them: without reference audio there is no speaker token to shift.
 
-| Emotion setting | Default | Range | Description |
-|---|---:|---:|---|
-| `emotion` | `none` | `none`, `happy`, `sad`, `angry`, `surprised` | Direction added to the projected speaker vector. `none` reproduces the output of a build without emotion support. |
-| `emotion_strength` | 1.0 | 0–3, step 0.05 | Multiplier on the strengths ZONOS2 calibrated per direction, so `1.0` already applies the intended amount. `0` disables emotion. |
-| `emotion_valence` | 0.0 | -1–1, step 0.05 | Continuous affect axis mixed in alongside the selected emotion; negative is unpleasant, positive is pleasant. |
-| `emotion_arousal` | 0.0 | -1–1, step 0.05 | Continuous affect axis mixed in alongside the selected emotion; negative is calm, positive is excited. |
-| `emotion_cfg_scale` | 1.0 | 1–3, step 0.05 | Classifier-free guidance on the emotion. `1.0` is off. Above `1.0` the node also generates an unguided twin and amplifies the difference, roughly doubling generation time. Upstream recommends `1.5`. |
+| Emotion setting     | Default |                                        Range | Description                                                                                                                                                                                            |
+| ------------------- | ------: | -------------------------------------------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `emotion`           |  `none` | `none`, `happy`, `sad`, `angry`, `surprised` | Direction added to the projected speaker vector. `none` reproduces the output of a build without emotion support.                                                                                      |
+| `emotion_strength`  |     1.0 |                               0–3, step 0.05 | Multiplier on the strengths ZONOS2 calibrated per direction, so `1.0` already applies the intended amount. `0` disables emotion.                                                                       |
+| `emotion_valence`   |     0.0 |                              -1–1, step 0.05 | Continuous affect axis mixed in alongside the selected emotion; negative is unpleasant, positive is pleasant.                                                                                          |
+| `emotion_arousal`   |     0.0 |                              -1–1, step 0.05 | Continuous affect axis mixed in alongside the selected emotion; negative is calm, positive is excited.                                                                                                 |
+| `emotion_cfg_scale` |     1.0 |                               1–3, step 0.05 | Classifier-free guidance on the emotion. `1.0` is off. Above `1.0` the node also generates an unguided twin and amplifies the difference, roughly doubling generation time. Upstream recommends `1.5`. |
 
 `calibration.json` supplies 3.0 for every direction except `surprised`, which uses 4.0; those values are folded into the weights before `emotion_strength` scales them. Emotion shifts delivery and leaves speaker identity intact, and it combines best with `accurate_mode` disabled. Guidance adds one batch row for the twin, which costs about 65 MiB of KV cache at the default `max_new_tokens`.
 
 ### Sampling controls
 
-| Control | Default | Range | Description |
-|---|---:|---:|---|
-| `max_new_tokens` | 1024 | 32–6000, step 8 | Maximum generated DAC-code frames. Higher values allow longer speech and use more time and KV-cache memory. |
-| `temperature` | 1.15 | 0–2 | Sampling randomness; `0` is greedy. |
-| `top_k` | 106 | 0–1026 | Keeps the K most likely tokens; `0` disables it. |
-| `top_p` | 0.0 | 0–1 | Nucleus sampling threshold; `0` disables it. |
-| `min_p` | 0.18 | 0–1 | Removes tokens below a fraction of the most likely token; `0` disables it. |
-| `repetition_window` | 50 | 0–512 | Recent frames checked for repetition; `0` disables tracking. |
-| `repetition_penalty` | 1.2 | 1–2 | Discourages repeated audio tokens; `1` disables the penalty. |
-| `repetition_codebooks` | 8 | -1–9 | Number of codebooks receiving the penalty; `-1` means all and `0` means none. |
-| `seed` | 0 | 0–9223372036854775807 | Positive values make identical runs repeatable; `0` uses the current random state. |
+| Control                | Default |                 Range | Description                                                                                                 |
+| ---------------------- | ------: | --------------------: | ----------------------------------------------------------------------------------------------------------- |
+| `max_new_tokens`       |    1024 |       32–6000, step 8 | Maximum generated DAC-code frames. Higher values allow longer speech and use more time and KV-cache memory. |
+| `temperature`          |    1.15 |                   0–2 | Sampling randomness; `0` is greedy.                                                                         |
+| `top_k`                |     106 |                0–1026 | Keeps the K most likely tokens; `0` disables it.                                                            |
+| `top_p`                |     0.0 |                   0–1 | Nucleus sampling threshold; `0` disables it.                                                                |
+| `min_p`                |    0.18 |                   0–1 | Removes tokens below a fraction of the most likely token; `0` disables it.                                  |
+| `repetition_window`    |      50 |                 0–512 | Recent frames checked for repetition; `0` disables tracking.                                                |
+| `repetition_penalty`   |     1.2 |                   1–2 | Discourages repeated audio tokens; `1` disables the penalty.                                                |
+| `repetition_codebooks` |       8 |                  -1–9 | Number of codebooks receiving the penalty; `-1` means all and `0` means none.                               |
+| `seed`                 |       0 | 0–9223372036854775807 | Positive values make identical runs repeatable; `0` uses the current random state.                          |
 
 ### ZONOS2 conditioning
 
 Every conditioning dropdown includes `default`, which leaves that feature unconditioned.
 
-| Control | Released buckets | Default |
-|---|---|---|
-| `speaking_rate` | 8 UTF-8 bytes-per-second ranges from `0–8` through `40+` | `default` |
-| `loudness_lufs` | 12 ranges from below `-50` through `-5+` LUFS | `default` |
-| `estimated_snr` | 12 ranges from below `0` through `60+` dB | `default` |
-| `maximum_pause` | 12 ranges from `0–0.5` through `5.5–6` seconds | `default` |
-| `estimated_bandlimit_hz` | 8 ranges from `495.3–3433` through `21062–24000` Hz | `default` |
-| `leading_silence` | 8 ranges from `0–0.05` through `4+` seconds | `default` |
-| `trailing_silence` | 8 ranges from `0–0.05` through `4+` seconds | `0.25–0.5` |
+| Control                  | Released buckets                                         | Default    |
+| ------------------------ | -------------------------------------------------------- | ---------- |
+| `speaking_rate`          | 8 UTF-8 bytes-per-second ranges from `0–8` through `40+` | `default`  |
+| `loudness_lufs`          | 12 ranges from below `-50` through `-5+` LUFS            | `default`  |
+| `estimated_snr`          | 12 ranges from below `0` through `60+` dB                | `default`  |
+| `maximum_pause`          | 12 ranges from `0–0.5` through `5.5–6` seconds           | `default`  |
+| `estimated_bandlimit_hz` | 8 ranges from `495.3–3433` through `21062–24000` Hz      | `default`  |
+| `leading_silence`        | 8 ranges from `0–0.05` through `4+` seconds              | `default`  |
+| `trailing_silence`       | 8 ranges from `0–0.05` through `4+` seconds              | `0.25–0.5` |
 
 </details>
 
@@ -278,7 +282,7 @@ Confirm the selected repository contains its root checkpoint plus `dac_44khz/` a
 
 **FP8 reports an unsupported format or a 3D linear weight**
 
-Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.7 rejects the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
+Update this custom node and fully restart ComfyUI so Python reloads the current FP8 format. Version 0.1.7 and later reject the retired all-layer FP8 layout and malformed expert tensors before inference. The supported checkpoint metadata format is the expert-gate/up-only layout used by `zonos2-fp8-mixed.safetensors`.
 
 **FlashAttention is unavailable**
 
@@ -348,6 +352,7 @@ If you find this model useful in an academic context, please cite:
 
 ## Credits
 
+- [Saganaki22/Zonos2_TTS-ComfyUI](https://github.com/Saganaki22/Zonos2_TTS-ComfyUI)
 - [Zyphra/ZONOS2](https://github.com/Zyphra/ZONOS2)
 - [Official Zyphra/ZONOS2 model release](https://huggingface.co/Zyphra/ZONOS2)
 - [Native BF16 ComfyUI model package](https://huggingface.co/drbaph/ZONOS2-BF16)
