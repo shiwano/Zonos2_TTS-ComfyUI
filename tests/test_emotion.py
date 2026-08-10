@@ -18,6 +18,8 @@ from zonos2_tts_comfyui_test.emotion import (
 from zonos2_tts_comfyui_test.native import (
     SamplingOptions,
     Zonos2Model,
+    _apply_emotion_cfg,
+    generate_audio_codes,
     read_config,
 )
 from zonos2_tts_comfyui_test.nodes import Zonos2VoiceClone
@@ -212,6 +214,70 @@ def test_model_rejects_a_delta_of_the_wrong_width():
         )
 
 
+def _codes_with_cfg(model, scale, delta):
+    prompt = torch.zeros(1, 4, model.config.n_codebooks + 1, dtype=torch.int32)
+    return generate_audio_codes(
+        model,
+        prompt,
+        attention_backend="SDPA",
+        options=SamplingOptions(max_new_tokens=3, temperature=0.0),
+        speaker_embedding=torch.randn(1, model.config.speaker_embedding_dim),
+        speaker_position=0,
+        emotion_delta=delta,
+        emotion_cfg_scale=scale,
+    )
+
+
+def test_guidance_runs_an_unguided_twin_in_the_same_batch():
+    model = _small_model()
+    widths = []
+    handle = model.multi_embedder.register_forward_hook(
+        lambda module, inputs, output: widths.append(output.shape[0])
+    )
+    try:
+        _codes_with_cfg(model, 1.5, torch.randn(model.config.dim))
+    finally:
+        handle.remove()
+
+    assert widths and set(widths) == {2}
+
+
+@pytest.mark.parametrize("scale", [1.0, 1.5])
+def test_guidance_leaves_the_batch_alone_without_a_delta(scale):
+    model = _small_model()
+    widths = []
+    handle = model.multi_embedder.register_forward_hook(
+        lambda module, inputs, output: widths.append(output.shape[0])
+    )
+    try:
+        _codes_with_cfg(model, scale, None)
+    finally:
+        handle.remove()
+
+    assert widths and set(widths) == {1}
+
+
+def test_cfg_combination_follows_the_upstream_formula():
+    logits = torch.stack(
+        [
+            torch.full((2, 4), 3.0),
+            torch.full((2, 4), 1.0),
+        ]
+    )
+
+    combined = _apply_emotion_cfg(logits, 1.5)
+
+    assert combined.shape == (1, 2, 4)
+    assert torch.allclose(combined, torch.full((1, 2, 4), 1.0 + 1.5 * 2.0))
+
+
+def test_clone_exposes_guidance_as_opt_in():
+    required = Zonos2VoiceClone.INPUT_TYPES()["required"]
+
+    assert required["emotion_cfg_scale"][1]["default"] == 1.0
+    assert required["emotion_cfg_scale"][1]["min"] == 1.0
+
+
 def _generate_with_emotion(monkeypatch, reference_audio, **emotion):
     captured = {}
 
@@ -297,10 +363,11 @@ def test_clone_exposes_the_shipped_emotions():
 def test_emotion_widgets_come_after_the_existing_ones():
     required = list(Zonos2VoiceClone.INPUT_TYPES()["required"])
 
-    assert required[-4:] == [
+    assert required[-5:] == [
         "emotion",
         "emotion_strength",
         "emotion_valence",
         "emotion_arousal",
+        "emotion_cfg_scale",
     ]
     assert required.index("seed") < required.index("emotion")

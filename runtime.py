@@ -309,6 +309,7 @@ def generate_zonos2_audio(
     emotion_valence: float = 0.0,
     emotion_arousal: float = 0.0,
     emotion_strength: float = 1.0,
+    emotion_cfg_scale: float = 1.0,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> dict:
     if bundle.model is None:
@@ -350,6 +351,7 @@ def generate_zonos2_audio(
         speaker_embedding=speaker_embedding,
         speaker_position=speaker_position,
         emotion_delta=emotion_delta,
+        emotion_cfg_scale=float(emotion_cfg_scale),
         progress_callback=progress_callback,
     )
     audio = codec.decode(

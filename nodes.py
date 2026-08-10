@@ -339,6 +339,16 @@ def _emotion_controls() -> dict:
                 "tooltip": "Continuous affect axis mixed in alongside the selected emotion. Negative is calm, positive is excited, 0 leaves the axis unused.",
             },
         ),
+        "emotion_cfg_scale": (
+            "FLOAT",
+            {
+                "default": 1.0,
+                "min": 1.0,
+                "max": 3.0,
+                "step": 0.05,
+                "tooltip": "Official ZONOS2 emotion classifier-free guidance. 1.0 disables it. Above 1.0 the model also generates an unguided twin and amplifies the difference, which strengthens the emotion at roughly double the generation time. Upstream recommends 1.5 with accurate_mode disabled.",
+            },
+        ),
     }
 
 
@@ -610,6 +620,7 @@ class Zonos2VoiceClone:
         emotion_strength: float = 1.0,
         emotion_valence: float = 0.0,
         emotion_arousal: float = 0.0,
+        emotion_cfg_scale: float = 1.0,
     ):
         options = _sampling_options(
             max_new_tokens,
@@ -642,6 +653,7 @@ class Zonos2VoiceClone:
             emotion_valence=float(emotion_valence),
             emotion_arousal=float(emotion_arousal),
             emotion_strength=float(emotion_strength),
+            emotion_cfg_scale=float(emotion_cfg_scale),
             progress_callback=_progress_callback(options.max_new_tokens),
         )
         return (audio,)

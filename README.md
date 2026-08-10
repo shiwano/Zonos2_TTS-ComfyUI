@@ -179,8 +179,9 @@ Voice Clone applies ZONOS2's official emotion directions, shipped in `emotion_di
 | `emotion_strength` | 1.0 | 0–3, step 0.05 | Multiplier on the strengths ZONOS2 calibrated per direction, so `1.0` already applies the intended amount. `0` disables emotion. |
 | `emotion_valence` | 0.0 | -1–1, step 0.05 | Continuous affect axis mixed in alongside the selected emotion; negative is unpleasant, positive is pleasant. |
 | `emotion_arousal` | 0.0 | -1–1, step 0.05 | Continuous affect axis mixed in alongside the selected emotion; negative is calm, positive is excited. |
+| `emotion_cfg_scale` | 1.0 | 1–3, step 0.05 | Classifier-free guidance on the emotion. `1.0` is off. Above `1.0` the node also generates an unguided twin and amplifies the difference, roughly doubling generation time. Upstream recommends `1.5`. |
 
-`calibration.json` supplies 3.0 for every direction except `surprised`, which uses 4.0; those values are folded into the weights before `emotion_strength` scales them. Emotion shifts delivery and leaves speaker identity intact, and it combines best with `accurate_mode` disabled. Upstream's `emotion_cfg_scale` is not ported.
+`calibration.json` supplies 3.0 for every direction except `surprised`, which uses 4.0; those values are folded into the weights before `emotion_strength` scales them. Emotion shifts delivery and leaves speaker identity intact, and it combines best with `accurate_mode` disabled. Guidance adds one batch row for the twin, which costs about 65 MiB of KV cache at the default `max_new_tokens`.
 
 ### Sampling controls
 

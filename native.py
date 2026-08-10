@@ -1517,6 +1517,13 @@ def sample_codes(
     ).squeeze(-1)
 
 
+def _apply_emotion_cfg(logits: torch.Tensor, scale: float) -> torch.Tensor:
+    """Combine the guided and unguided rows into a single set of logits."""
+    conditional = logits[0:1].float()
+    unconditional = logits[1:2].float()
+    return unconditional + float(scale) * (conditional - unconditional)
+
+
 @torch.inference_mode()
 def generate_audio_codes(
     model: Zonos2Model,
@@ -1526,6 +1533,7 @@ def generate_audio_codes(
     speaker_embedding: torch.Tensor | None = None,
     speaker_position: int | None = None,
     emotion_delta: torch.Tensor | None = None,
+    emotion_cfg_scale: float = 1.0,
     progress_callback: Callable[[int, int], None] | None = None,
 ) -> tuple[torch.Tensor, int | None]:
     device = torch.device(
@@ -1533,6 +1541,16 @@ def generate_audio_codes(
     )
     dtype = model.runtime_dtype or next(model.parameters()).dtype
     prompt = prompt.to(device=device)
+    guided = (
+        emotion_delta is not None
+        and speaker_position is not None
+        and float(emotion_cfg_scale) != 1.0
+    )
+    if guided:
+        prompt = prompt.repeat(2, 1, 1)
+        emotion_delta = torch.stack(
+            [emotion_delta, torch.zeros_like(emotion_delta)]
+        )
     total_length = prompt.shape[1] + int(options.max_new_tokens)
     if total_length > model.config.max_seqlen:
         raise ValueError(
@@ -1554,6 +1572,8 @@ def generate_audio_codes(
         speaker_position=speaker_position,
         emotion_delta=emotion_delta,
     )
+    if guided:
+        logits = _apply_emotion_cfg(logits, emotion_cfg_scale)
     generated: list[torch.Tensor] = []
     eos_frame: int | None = None
     eos_countdown = 0
@@ -1616,11 +1636,15 @@ def generate_audio_codes(
                     ),
                 ]
             ).view(1, 1, -1)
+            if guided:
+                next_row = next_row.repeat(2, 1, 1)
             logits = model(
                 next_row,
                 caches,
                 attention_backend,
             )
+            if guided:
+                logits = _apply_emotion_cfg(logits, emotion_cfg_scale)
     finally:
         if terminal_progress is not None:
             terminal_progress.close()
