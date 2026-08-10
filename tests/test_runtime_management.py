@@ -3,6 +3,7 @@ import weakref
 from dataclasses import replace
 from pathlib import Path
 
+import pytest
 import torch
 import torch.nn as nn
 
@@ -98,7 +99,7 @@ def test_bundle_resume_batches_patchers(monkeypatch):
 
 
 def test_comfy_registration_logs_only_new_patchers(monkeypatch):
-    import comfy.model_management as mm
+    mm = pytest.importorskip("comfy.model_management")
 
     class FakePatcher:
         load_device = torch.device("cuda")
@@ -136,7 +137,7 @@ def test_comfy_registration_logs_only_new_patchers(monkeypatch):
 
 
 def test_dynamic_patcher_sees_each_moe_expert_as_separate_modules():
-    from comfy.model_patcher import ModelPatcher
+    ModelPatcher = pytest.importorskip("comfy.model_patcher").ModelPatcher
 
     config = replace(
         read_config(ROOT / "assets" / "params.json"),

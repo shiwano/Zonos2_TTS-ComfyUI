@@ -30,9 +30,9 @@ def test_released_model_layout_size():
 
 
 def test_model_builds_with_aimdo_lazy_linear_initialization(monkeypatch):
-    import comfy.memory_management
+    memory_management = pytest.importorskip("comfy.memory_management")
 
-    monkeypatch.setattr(comfy.memory_management, "aimdo_enabled", True)
+    monkeypatch.setattr(memory_management, "aimdo_enabled", True)
     model = build_native_model(read_config(ROOT / "assets" / "params.json"))
 
     assert model.layers[0].attention.wq.weight is not None
