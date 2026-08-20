@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import gc
-import importlib.util
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -411,11 +410,13 @@ def _flash_attention_available(
     device: torch.device,
     dtype: torch.dtype,
 ) -> bool:
-    return (
-        device.type == "cuda"
-        and dtype in {torch.float16, torch.bfloat16}
-        and importlib.util.find_spec("flash_attn") is not None
-    )
+    if device.type != "cuda" or dtype not in {torch.float16, torch.bfloat16}:
+        return False
+    try:
+        from flash_attn import flash_attn_func
+    except Exception:
+        return False
+    return callable(flash_attn_func)
 
 
 def resolve_attention(

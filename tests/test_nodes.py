@@ -1,39 +1,61 @@
+import sys
+import types
+
 import pytest
 import torch
 import torch.nn as nn
-from safetensors.torch import save_file
-
 import zonos2_tts_comfyui_test.loader as loader_module
-from zonos2_tts_comfyui_test.loader import (
-    ATTENTION_OPTIONS,
-    BF16_REPO_ID,
-    DTYPE_OPTIONS,
-    FP8_REPO_ID,
-    FP8_E4M3_FORMAT,
-    FP8_E4M3_POLICY,
-    LEGACY_FP8_E4M3_FORMAT,
-    inspect_checkpoint_quantization,
-    resolve_dtype,
-    resolve_model_path,
-    resolve_model_source,
-    validate_quantized_checkpoint,
-)
-from zonos2_tts_comfyui_test.nodes import (
-    QUALITY_BUCKET_LABELS,
-    Zonos2VoiceClone,
-    Zonos2VoiceGeneration,
-)
-from zonos2_tts_comfyui_test.runtime import (
-    MAX_REFERENCE_SECONDS,
-    Zonos2SpeakerEncoder,
-    _require_or_download,
-    logger,
-)
+from safetensors.torch import save_file
+from zonos2_tts_comfyui_test.loader import (ATTENTION_OPTIONS, BF16_REPO_ID,
+                                            DTYPE_OPTIONS, FP8_E4M3_FORMAT,
+                                            FP8_E4M3_POLICY, FP8_REPO_ID,
+                                            LEGACY_FP8_E4M3_FORMAT,
+                                            inspect_checkpoint_quantization,
+                                            resolve_attention, resolve_dtype,
+                                            resolve_model_path,
+                                            resolve_model_source,
+                                            validate_quantized_checkpoint)
+from zonos2_tts_comfyui_test.nodes import (QUALITY_BUCKET_LABELS,
+                                           Zonos2VoiceClone,
+                                           Zonos2VoiceGeneration)
+from zonos2_tts_comfyui_test.runtime import (MAX_REFERENCE_SECONDS,
+                                             Zonos2SpeakerEncoder,
+                                             _require_or_download, logger)
 
 
 def test_loader_option_order():
     assert DTYPE_OPTIONS == ["auto", "bf16", "fp16"]
     assert ATTENTION_OPTIONS == ["auto", "SDPA", "flash_attention"]
+
+
+def _install_flash_attn(monkeypatch, flash_attn_func):
+    module = types.ModuleType("flash_attn")
+    if flash_attn_func is not None:
+        module.__dict__["flash_attn_func"] = flash_attn_func
+    monkeypatch.setitem(sys.modules, "flash_attn", module)
+
+
+def test_auto_attention_uses_flash_attention_when_it_is_usable(monkeypatch):
+    _install_flash_attn(monkeypatch, lambda *args, **kwargs: (args, kwargs))
+
+    resolved = resolve_attention("auto", torch.device("cuda"), torch.bfloat16)
+
+    assert resolved == "flash_attention"
+
+
+def test_auto_attention_falls_back_when_flash_attn_is_unusable(monkeypatch):
+    _install_flash_attn(monkeypatch, None)
+
+    resolved = resolve_attention("auto", torch.device("cuda"), torch.bfloat16)
+
+    assert resolved == "sdpa"
+
+
+def test_explicit_flash_attention_rejects_unusable_flash_attn(monkeypatch):
+    _install_flash_attn(monkeypatch, None)
+
+    with pytest.raises(RuntimeError):
+        resolve_attention("flash_attention", torch.device("cuda"), torch.bfloat16)
 
 
 def test_model_catalog_routes_each_preset_to_its_own_repo():
