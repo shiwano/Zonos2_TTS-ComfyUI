@@ -1,7 +1,7 @@
 [project]
 name = "zonos2-tts-comfyui-emotion"
 description = "Native ComfyUI nodes for Zyphra ZONOS2 text-to-speech and voice cloning with AIMDO memory tracking and emotion conditioning"
-version = "0.2.0"
+version = "0.2.1"
 license = { file = "LICENSE" }
 dependencies = ["accelerate", "huggingface-hub", "numpy", "safetensors", "tqdm"]
 
