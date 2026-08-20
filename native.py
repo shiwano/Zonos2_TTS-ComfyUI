@@ -6,7 +6,7 @@ import json
 import logging
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import torch
 import torch.nn as nn
@@ -789,7 +789,7 @@ class Zonos2Model(nn.Module):
 
     def materialize_runtime_buffers(self, device: torch.device) -> None:
         for layer in self.layers:
-            layer.attention.materialize_rope(
+            cast(TransformerBlock, layer).attention.materialize_rope(
                 self.config.max_seqlen,
                 self.config.rope_theta,
                 device,
@@ -966,10 +966,11 @@ def validate_quantized_runtime_model(model: Zonos2Model) -> None:
     expert_count = 0
     invalid: list[str] = []
     for layer_index, layer in enumerate(model.layers):
-        if not layer.is_moe:
+        block = cast(TransformerBlock, layer)
+        if not block.is_moe:
             continue
         for expert_index, expert in enumerate(
-            layer.feed_forward.experts.experts
+            cast(MoEFeedForward, block.feed_forward).experts.experts
         ):
             expert_count += 1
             if not isinstance(expert, QuantizedSonicExpert):
@@ -1547,9 +1548,8 @@ def generate_audio_codes(
     )
     if guided:
         prompt = prompt.repeat(2, 1, 1)
-        emotion_delta = torch.stack(
-            [emotion_delta, torch.zeros_like(emotion_delta)]
-        )
+        delta = cast(torch.Tensor, emotion_delta)
+        emotion_delta = torch.stack([delta, torch.zeros_like(delta)])
     total_length = prompt.shape[1] + int(options.max_new_tokens)
     if total_length > model.config.max_seqlen:
         raise ValueError(

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, cast
 
 import torch
 import torch.nn as nn
@@ -97,7 +97,7 @@ class Zonos2DAC(nn.Module):
         if codes.numel() == 0:
             raise RuntimeError("ZONOS2 ended before producing decodable audio.")
         codes = codes.clamp_(0, 1023).transpose(0, 1).unsqueeze(0)
-        output = self.model.decode(audio_codes=codes).audio_values
+        output = cast(Any, self.model).decode(audio_codes=codes).audio_values
         if output.ndim == 3:
             output = output.mean(dim=1)
         return output.float().cpu()

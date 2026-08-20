@@ -545,9 +545,9 @@ def register_runtime_module(
         load_device=torch.device(device),
         offload_device=torch.device("cpu"),
     )
-    module.model_loaded_weight_memory = 0
+    setattr(module, "model_loaded_weight_memory", 0)
     if not patcher.is_dynamic() and hasattr(module, "device"):
-        module.device = torch.device(device)
+        setattr(module, "device", torch.device(device))
     _register_with_comfy(patcher)
     return patcher
 
@@ -612,11 +612,11 @@ def unload_zonos2_bundle(
         if not isinstance(module, torch.nn.Module):
             continue
         try:
-            module.model_loaded_weight_memory = 0
+            setattr(module, "model_loaded_weight_memory", 0)
             if hasattr(module, "dynamic_vbars"):
-                module.dynamic_vbars.clear()
+                getattr(module, "dynamic_vbars").clear()
             if hasattr(module, "dynamic_pins"):
-                module.dynamic_pins.clear()
+                getattr(module, "dynamic_pins").clear()
             if hard and hasattr(module, "to_empty"):
                 module.to_empty(device=torch.device("meta"))
             elif not hard:
